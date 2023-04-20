@@ -82,7 +82,13 @@ int main() {
 
   start_time = omp_get_wtime();
 
-  unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+  // for (int i = 0; i < 20; i++)
+  // {
+  // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+  optimised_layer_arraycopying_vectorised(in_FP, filter_FP, bias_array_FP, out_FP);
+
+
+  // }
 
   run_time = (omp_get_wtime() - start_time);
 
