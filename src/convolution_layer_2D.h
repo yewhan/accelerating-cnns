@@ -44,6 +44,7 @@ int optimised_layerv11_unroll_d8(const float* in_FP, const float* filter_FP, con
 int optimised_layerv12_ops_outside_loop(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layerv13_arraycopying_sign_unsigned(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layerv14_omp_2blocks(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layerv15_omp_1block(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
 
 
