@@ -42,7 +42,7 @@ int optimised_layerv9_unroll_d2(const float* in_FP, const float* filter_FP, cons
 int optimised_layerv10_unroll_d4(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layerv11_unroll_d8(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layerv12_ops_outside_loop(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
-
+int optimised_layerv13_arraycopying_sign_unsigned(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
 
 
