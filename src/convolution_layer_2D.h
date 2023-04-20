@@ -34,7 +34,8 @@ int optimised_layerv1_arraycopying_vectorised(const float* in_FP, const float* f
 int optimised_layerv2_unroll_x2(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layerv3_unroll_x4(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layerv4_unroll_m16(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
-int optimised_layerv5_strength_reduction(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layerv5_strength_reduction_d(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layerv6_strength_reduction_x(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
 
 

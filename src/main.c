@@ -89,7 +89,8 @@ int main() {
   // optimised_layerv2_unroll_x2(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv3_unroll_x4(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv4_unroll_m16(in_FP, filter_FP, bias_array_FP, out_FP);
-  optimised_layerv5_strength_reduction(in_FP, filter_FP, bias_array_FP, out_FP);
+  // optimised_layerv5_strength_reduction_d(in_FP, filter_FP, bias_array_FP, out_FP);
+  optimised_layerv6_strength_reduction_m(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
   // }
