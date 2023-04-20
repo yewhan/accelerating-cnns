@@ -597,10 +597,7 @@ int unoptimized_layer_FP(const float* in_FP, const float* filter_FP, const float
   }
 
   printf("\n from unopt %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
-  LIKWID_MARKER_STOP("foo");
-  LIKWID_MARKER_CLOSE;
   return 0;
-
 }
 
 
