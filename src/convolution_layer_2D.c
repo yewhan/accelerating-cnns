@@ -1917,6 +1917,322 @@ int optimised_layerv11_unroll_d8(const float* in_FP, const float* filter_FP, con
 }
 
 
+// move operations outside of d loop, general registers used in d loop = 16
+// 81 GFLOPS, 1.07x speedup from v11
+int optimised_layerv12_ops_outside_loop(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  #define m_tile 16
+
+  __m256 bias, bias2, temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8, s, s2, s3, s4, w, w2;
+
+  unsigned int yx_in_depth = Input_Y_dim * Input_X_dim * Input_depth_dim;
+  unsigned int x_in_depth = Input_X_dim * Input_depth_dim;
+
+  unsigned int mask_in_out_depth = Mask_X_dim * Input_depth_dim * Output_depth_dim;
+  // unsigned int in_out_depth = Input_depth_dim * Output_depth_dim;
+
+  unsigned int filter_FP_length = Output_depth_dim * Mask_Y_dim * Mask_X_dim * Input_depth_dim;
+  float* filter_FP_copy = (float*)_mm_malloc(filter_FP_length * sizeof(float), 64);
+  if (filter_FP_copy == NULL) {
+    printf("\nerror with malloc allocating filter array copy");
+    exit(EXIT_FAILURE);
+  }
+
+  // array copying - filter_FP into form usable for vectorising m loop
+
+  for (int m = 0; m < Output_depth_dim; m += 8) {
+    for (int y = 0; y < Mask_Y_dim; y++) {
+      for (int x = 0; x < Mask_X_dim; x++) {
+        for (int d = 0; d < Input_depth_dim; d++) {
+          for (int mm = m; mm < m + 8; mm++) {
+            unsigned long long int old_subscript = mm * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+              + y * Mask_X_dim * Input_depth_dim
+              + x * Input_depth_dim
+              + d;
+              
+            unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+              + x * Input_depth_dim * Output_depth_dim
+              + d * Output_depth_dim
+              + mm;
+
+            filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          }
+        }
+      }
+    }
+  }
+
+
+  // main loop body
+  for (unsigned int mm = 0; mm < Output_depth_dim; mm += m_tile) {
+    for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+      for (unsigned int m = mm; m < mm + m_tile; m+=16) { //channels
+        bias = _mm256_load_ps(&bias_array_FP[m]);
+        bias2 = _mm256_load_ps( &bias_array_FP[m+8]);
+
+        for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+          for (unsigned int x = 0; x < Output_X_dim; x+=4) {	//Output Width
+            temp = _mm256_setzero_ps();
+            temp2 = _mm256_setzero_ps();
+            temp3 = _mm256_setzero_ps();
+            temp4 = _mm256_setzero_ps();
+            temp5 = _mm256_setzero_ps();
+            temp6 = _mm256_setzero_ps();
+            temp7 = _mm256_setzero_ps();
+            temp8 = _mm256_setzero_ps();
+            // bias = bias_array_FP[m];
+            // temp = 0.0f;
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                for (unsigned int d = 0; d < Input_depth_dim; d+=8) {
+
+                  unsigned long long int in_subscript = b * yx_in_depth
+                    + (y * Stride_Y_dim + off_y) * x_in_depth
+                    + (x * Stride_X_dim + off_x) * Input_depth_dim
+                    + d;
+
+                  unsigned long long int filter_subscript = off_y * mask_in_out_depth
+                    + off_x * Input_depth_dim * Output_depth_dim
+                    + d * Output_depth_dim
+                    + m;
+
+
+                  s = _mm256_set1_ps(in_FP[in_subscript]);        // d, x
+                  s2 = _mm256_set1_ps(in_FP[in_subscript + Input_depth_dim]); // d, x+1
+                  s3 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 2)]); // d, x+2
+                  s4 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 3)]); // d, x+3
+
+                  w = _mm256_load_ps(&filter_FP_copy[filter_subscript]);      // d, m
+                  w2 = _mm256_load_ps(&filter_FP_copy[filter_subscript + 8]); // d, m+8
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+
+                  // __________________________________________________________________________
+                  // |
+                  // |
+                  // v d+1
+
+                  s = _mm256_set1_ps(in_FP[in_subscript + 1]);        // d+1, x
+                  s2 = _mm256_set1_ps(in_FP[in_subscript + Input_depth_dim + 1]); // d+1, x+1
+                  s3 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 2) + 1]); // d+1, x+2
+                  s4 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 3) + 1]); // d+1, x+3
+
+                  w = _mm256_load_ps(&filter_FP_copy[filter_subscript + Output_depth_dim]);      // d+1, m
+                  w2 = _mm256_load_ps(&filter_FP_copy[filter_subscript + Output_depth_dim + 8]); // d+1, m+8
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+
+                  // __________________________________________________________________________
+                  // |
+                  // |
+                  // v d+2
+
+                  s = _mm256_set1_ps(in_FP[in_subscript + 2]);        // d+2, x
+                  s2 = _mm256_set1_ps(in_FP[in_subscript + Input_depth_dim + 2]); // d+2, x+1
+                  s3 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 2) + 2]); // d+2, x+2
+                  s4 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 3) + 2]); // d+2, x+3
+
+                  w = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 2)]);      // d+2, m
+                  w2 = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 2) + 8]); // d+2, m+8
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+
+                  // __________________________________________________________________________
+                  // |
+                  // |
+                  // v d+3
+
+                  s = _mm256_set1_ps(in_FP[in_subscript + 3]);        // d+3, x
+                  s2 = _mm256_set1_ps(in_FP[in_subscript + Input_depth_dim + 3]); // d+3, x+1
+                  s3 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 2) + 3]); // d+3, x+2
+                  s4 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 3) + 3]); // d+3, x+3
+
+                  w = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 3)]);      // d+3, m
+                  w2 = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 3) + 8]); // d+3, m+8
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+
+                  // __________________________________________________________________________
+                  // |
+                  // |
+                  // v d+4
+
+                  s = _mm256_set1_ps(in_FP[in_subscript + 4]);        // d+4, x
+                  s2 = _mm256_set1_ps(in_FP[in_subscript + Input_depth_dim + 4]); // d+4, x+1
+                  s3 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 2) + 4]); // d+4, x+2
+                  s4 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 3) + 4]); // d+4, x+3
+
+                  w = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 4)]);      // d+4, m
+                  w2 = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 4) + 8]); // d+4, m+8
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+
+                  // __________________________________________________________________________
+                  // |
+                  // |
+                  // v d+5
+
+                  s = _mm256_set1_ps(in_FP[in_subscript + 5]);        // d+5, x
+                  s2 = _mm256_set1_ps(in_FP[in_subscript + Input_depth_dim + 5]); // d+5, x+1
+                  s3 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 2) + 5]); // d+5, x+2
+                  s4 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 3) + 5]); // d+5, x+3
+
+                  w = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 5)]);      // d+5, m
+                  w2 = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 5) + 8]); // d+5, m+8
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+
+                  // __________________________________________________________________________
+                  // |
+                  // |
+                  // v d+6
+
+                  s = _mm256_set1_ps(in_FP[in_subscript + 6]);        // d+6, x
+                  s2 = _mm256_set1_ps(in_FP[in_subscript + Input_depth_dim + 6]); // d+6, x+1
+                  s3 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 2) + 6]); // d+6, x+2
+                  s4 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 3) + 6]); // d+6, x+3
+
+                  w = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 6)]);      // d+6, m
+                  w2 = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 6) + 8]); // d+6, m+8
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+
+                  // __________________________________________________________________________
+                  // |
+                  // |
+                  // v d+7
+
+                  s = _mm256_set1_ps(in_FP[in_subscript + 7]);        // d+7, x
+                  s2 = _mm256_set1_ps(in_FP[in_subscript + Input_depth_dim + 7]); // d+7, x+1
+                  s3 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 2) + 7]); // d+7, x+2
+                  s4 = _mm256_set1_ps(in_FP[in_subscript + (Input_depth_dim * 3) + 7]); // d+7, x+3
+
+                  w = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 7)]);      // d+7, m
+                  w2 = _mm256_load_ps(&filter_FP_copy[filter_subscript + (Output_depth_dim * 7) + 8]); // d+7, m+8
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                  // float s = in_FP[in_subscript];
+                  // float w = filter_FP[filter_subscript];
+                  // temp = temp + s * w;
+                }
+              }
+            }
+
+
+            unsigned long long int out_subscript = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+              y * (Output_depth_dim * Output_X_dim) +
+              x * Output_depth_dim
+              + m;
+
+            
+            temp = _mm256_add_ps(temp, bias);
+            temp = _mm256_max_ps(temp, _mm256_setzero_ps());
+            _mm256_store_ps(&out_to_compare_with_FP[out_subscript], temp);
+
+            temp2 = _mm256_add_ps(temp2, bias);
+            temp2 = _mm256_max_ps(temp2, _mm256_setzero_ps());
+            _mm256_store_ps(&out_to_compare_with_FP[out_subscript + Output_depth_dim], temp2); // x+1
+
+            temp3 = _mm256_add_ps(temp3, bias);
+            temp3 = _mm256_max_ps(temp3, _mm256_setzero_ps());
+            _mm256_store_ps(&out_to_compare_with_FP[out_subscript + (Output_depth_dim * 2)], temp3); // x+2
+
+            temp4 = _mm256_add_ps(temp4, bias);
+            temp4 = _mm256_max_ps(temp4, _mm256_setzero_ps());
+            _mm256_store_ps(&out_to_compare_with_FP[out_subscript + (Output_depth_dim * 3)], temp4); // x+3
+
+            temp5 = _mm256_add_ps(temp5, bias2);
+            temp5 = _mm256_max_ps(temp5, _mm256_setzero_ps());
+            _mm256_store_ps(&out_to_compare_with_FP[out_subscript + 8], temp5); // m+8
+
+            temp6 = _mm256_add_ps(temp6, bias2);
+            temp6 = _mm256_max_ps(temp6, _mm256_setzero_ps());
+            _mm256_store_ps(&out_to_compare_with_FP[out_subscript + Output_depth_dim + 8], temp6); // m+8, x+1
+
+            temp7 = _mm256_add_ps(temp7, bias2);
+            temp7 = _mm256_max_ps(temp7, _mm256_setzero_ps());
+            _mm256_store_ps(&out_to_compare_with_FP[out_subscript + (Output_depth_dim * 2) + 8], temp7); // m+8, x+2
+
+            temp8 = _mm256_add_ps(temp8, bias2);
+            temp8 = _mm256_max_ps(temp8, _mm256_setzero_ps());
+            _mm256_store_ps(&out_to_compare_with_FP[out_subscript + (Output_depth_dim * 3) + 8], temp8); // m+8, x+3
+            // temp += bias;
+            // out_to_compare_with_FP[out_subscript] = Relu_float(temp);
+
+          }
+        }
+      }
+    }
+  }
+  printf("\n from optimised_layer_v12 %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  _mm_free(filter_FP_copy);
+  return 0;
+}
+
+
 
 
 // 2 GFLOPS

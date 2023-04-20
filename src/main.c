@@ -98,6 +98,7 @@ int main() {
   // optimised_layerv9_unroll_d2(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv10_unroll_d4(in_FP, filter_FP, bias_array_FP, out_FP);
   optimised_layerv11_unroll_d8(in_FP, filter_FP, bias_array_FP, out_FP);
+  // optimised_layerv12_ops_outside_loop(in_FP, filter_FP, bias_array_FP, out_FP);
 
   }
 
@@ -171,7 +172,7 @@ void read_layer_dimensions() {
     Mask_Y_dim=3;
     Mask_X_dim=3;
 
-    Output_depth_dim=128;
+    Output_depth_dim=256;
     Output_X_dim=(Input_X_dim-(Mask_X_dim-Stride_X_dim)) / Stride_X_dim;
     Output_Y_dim=(Input_Y_dim-(Mask_Y_dim-Stride_Y_dim)) / Stride_Y_dim;
 

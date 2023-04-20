@@ -41,6 +41,7 @@ int optimised_layerv8_loop_tiling_m(const float* in_FP, const float* filter_FP, 
 int optimised_layerv9_unroll_d2(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layerv10_unroll_d4(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layerv11_unroll_d8(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layerv12_ops_outside_loop(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
 
 
