@@ -77,13 +77,15 @@ int main() {
   load_create_input_output_array_FP();
   load_filter_array_FP();
   // Dr. Kelefouras' unoptimized layer taken as a base:
-  unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
+  // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
+  optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+  // optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
   start_time = omp_get_wtime();
 
-  // for (int i = 0; i < 20; i++)
-  // {
+  for (int i = 0; i < 20; i++)
+  {
   // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv1_arraycopying_vectorised(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv2_unroll_x2(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -92,14 +94,17 @@ int main() {
   // optimised_layerv5_register_pressure_d(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv7_strength_reduction_d(in_FP, filter_FP, bias_array_FP, out_FP);
-  optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_FP);
+  // optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_FP);
+  // optimised_layerv9_unroll_d2(in_FP, filter_FP, bias_array_FP, out_FP);
+  // optimised_layerv10_unroll_d4(in_FP, filter_FP, bias_array_FP, out_FP);
+  optimised_layerv11_unroll_d8(in_FP, filter_FP, bias_array_FP, out_FP);
 
-  // }
+  }
 
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/20);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
