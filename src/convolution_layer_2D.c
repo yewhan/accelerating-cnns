@@ -358,7 +358,7 @@ int optimised_layerv3_unroll_x4(const float* in_FP, const float* filter_FP, cons
 
 // register block/ unroll m by factor of 2 (m+=16)
 // 61 GFLOPS, 1.79x speedup from v3
-int optimised_layerv5_unroll_m16(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+int optimised_layerv4_unroll_m16(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
   __m256 bias, bias2, temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8, s, s2, s3, s4, w, w2;
 
   unsigned int filter_FP_length = Output_depth_dim * Mask_Y_dim * Mask_X_dim * Input_depth_dim;
