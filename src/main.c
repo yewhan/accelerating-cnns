@@ -11,6 +11,8 @@ The layer input parameters are specified in  void read_layer_dimensions().
 */
 
 #include "convolution_layer_2D.h"
+#include <limits.h>
+#include <stdint.h>
 
 void read_layer_dimensions();
 
@@ -20,6 +22,7 @@ void load_bias_FP();
 void deallocate_FP();
 void compare_output_result_FP();
 unsigned short int equal(float const a, float const b);
+
 
 //input dimensions
 unsigned int Input_Output_batch_dim;
@@ -59,6 +62,13 @@ float* out_FP; //pointer to output array
 float* out_to_compare_with_FP; //pointer to output array to compare with
 float* bias_array_FP;
 
+// quantised tensors
+unsigned char* in_Char;                   // pointer to input array - char
+unsigned char* out_Char;                  // pointer to output array - char
+unsigned char* out_to_compare_with_Char;  // pointer to output array to compare with - char
+signed char* filter_Char;                        // pointer to filter array - char
+int* bias_array_Int;                      // pointer to bias array - int
+// int_fast32_t* bias_array_Int;             // pointer to bias array - fast int of 32 bits
 
 #define EPSILON 0.001
 
@@ -81,7 +91,7 @@ int main() {
   // optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
   // optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
   // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-  optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+  // optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
 
@@ -105,6 +115,7 @@ int main() {
   // optimised_layerv13_arraycopying_sign_unsigned(in_FP, filter_FP, bias_array_FP, out_FP);
   optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_FP);
+  // test(in_FP, filter_FP, bias_array_FP, out_FP);
 
   }
 
@@ -210,15 +221,28 @@ void load_bias_FP() {
     exit(EXIT_FAILURE);
   }
 
+  bias_array_Int = (int*)_mm_malloc(Output_depth_dim * sizeof(int), 64);
+  if (bias_array_Int == NULL) {
+    printf("\nerror with malloc allocating bias int array");
+    exit(EXIT_FAILURE);
+  }
 
+  
+  float min = 1.00f;
+  float max = 5.00f;
+  int levels = 65536;   // maybe swap to max int val?
+  float scale = (max - min) / (levels-1);
+  float zero_point = -min / scale;
+
+  int cnt = 0;
   for (unsigned int i = 0; i < Output_depth_dim; i++) {
     *(bias_array_FP + i) = ((float)(rand() % 5)) + 1;
     //  *(bias_array_FP+i)=0.0f;
     // printf("  %d",*(in+i));
+    
+    *(bias_array_Int + i) = round((*(bias_array_FP + i) / scale) + zero_point);
+    cnt++; // for debugging
   }
-
-
-
 }
 
 
@@ -239,6 +263,23 @@ int load_create_input_output_array_FP() {
   }
 
 
+  // set so it checks for macro of quantization on/ off?
+  // experiment with using lookup tables?
+  // quantization relevant ops
+  in_Char = (unsigned char*)_mm_malloc(input_size * sizeof(unsigned char), 64);
+  if (in_Char == NULL) {
+    printf("\nerror with malloc allocating input char array");
+    exit(EXIT_FAILURE);
+  }
+
+  float min = 0.73f;  // lowest in_FP value == 0.73
+  float max = 49.73f; // highest in_FP value == 49.73
+  int levels = 256;    // 256 due to char being 2 Byte, maybe swap to 50 levels, 0 to 49?
+  float scale = (max - min) / (levels - 1);
+  float zero_point = -min / scale;
+
+
+  int cnt = 0;
   for (unsigned int b = 0; b < Input_Output_batch_dim; b++) {
     for (unsigned int y = 0; y < Input_Y_dim; y++) {
       for (unsigned int x = 0; x < Input_X_dim; x++) {
@@ -246,6 +287,9 @@ int load_create_input_output_array_FP() {
           in_subscript = (unsigned long long int) b * Input_Y_dim * Input_X_dim * Input_depth_dim + (unsigned long long int) y * Input_X_dim * Input_depth_dim + (unsigned long long int) x * Input_depth_dim + d;
 
           in_FP[in_subscript] = ((float)(d % 50)) + 0.73f;
+          // in_Char[in_subscript] = (unsigned char)((in_FP[in_subscript] - min) / scale + 0.5f);
+          in_Char[in_subscript] = (unsigned char)((in_FP[in_subscript] / scale) + zero_point);
+          // cnt++; // for debugging
         }
       }
     }
@@ -258,7 +302,6 @@ int load_create_input_output_array_FP() {
     exit(EXIT_FAILURE);
   }
 
-
   out_to_compare_with_FP = (float*)_mm_malloc(output_size * sizeof(float), 64);
   if (out_to_compare_with_FP == NULL) {
     printf("\nerror with malloc allocating output array to compare with");
@@ -266,7 +309,21 @@ int load_create_input_output_array_FP() {
   }
 
 
+  // allocate memory for quantised tensors
+  out_Char = (unsigned char*)_mm_malloc(output_size * sizeof(unsigned char), 64);
+  if (out_Char == NULL) {
+    printf("\nerror with malloc allocating output char array");
+    exit(EXIT_FAILURE);
+  }
 
+  out_to_compare_with_Char = (unsigned char*)_mm_malloc(output_size * sizeof(unsigned char), 64);
+  if (out_to_compare_with_Char == NULL) {
+    printf("\nerror with malloc allocating output char array");
+    exit(EXIT_FAILURE);
+  }
+
+
+  // cnt = 0;
   for (unsigned int b = 0; b < Input_Output_batch_dim; b++) {
     for (unsigned int y = 0; y < Output_Y_dim; y++) {
       for (unsigned int x = 0; x < Output_X_dim; x++) {
@@ -277,8 +334,12 @@ int load_create_input_output_array_FP() {
             + m;
 
           out_to_compare_with_FP[out_subscript] = 0.0f;
-
           out_FP[out_subscript] = 0.0f;
+
+
+          out_to_compare_with_Char[out_subscript] = 0;
+          out_Char[out_subscript] = 0;
+          // cnt++; // for debugging
         }
       }
     }
@@ -318,6 +379,17 @@ int load_filter_array_FP() {
   }
 
 
+  filter_Char = (signed char*)_mm_malloc(filter_size * sizeof(char), 64);
+  if (filter_Char == NULL) {
+    printf("\nerror with malloc allocating filter char array");
+    exit(EXIT_FAILURE);
+  }
+
+  float min = -7.973f;
+  float max = 7.973f;
+  int levels = 256;
+  float scale = (max - min) / (levels - 1);
+  float val, val2;
 
   //read the filter array
   for (m = 0; m < Output_depth_dim; m++) {
@@ -332,7 +404,25 @@ int load_filter_array_FP() {
           filter_FP[offset] = ((rand() % 8) + 0.973f);
           filter_FP[offset + 1] = -((rand() % 8) + 0.973f);
           // printf("\n %d, %d",filter_FP[offset],filter_FP[offset+1]);
-          cnt++;
+
+          
+          filter_Char[offset] = (signed char)fmin(filter_FP[offset]/ scale, SCHAR_MAX);
+          filter_Char[offset + 1] = (signed char)fmax(filter_FP[offset+1]/ scale, SCHAR_MIN);
+
+          // dequantistaion for debugging:
+          val = filter_Char[offset] * scale;
+          val2 = filter_Char[offset + 1] * scale;
+
+
+          // 1st asymmetric quantisation attempt:
+          // filter_Char[offset] = (signed char)((filter_FP[offset] / -scale) + zero_point);
+          // filter_Char[offset + 1] = (signed char)((filter_FP[offset + 1] / scale) + zero_point);
+
+          // asymmetric de-quantisation for debugging:
+          // val = scale * (filter_Char[offset] - zero_point);
+          // val2 = scale * (filter_Char[offset + 1] - zero_point);
+          
+          // cnt++; // for debugging
         }
       }
     }

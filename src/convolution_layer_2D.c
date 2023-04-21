@@ -2574,7 +2574,7 @@ int optimised_layerv14_omp_2blocks(const float* in_FP, const float* filter_FP, c
     for (unsigned int y = 0; y < Mask_Y_dim; y++) {
       for (unsigned int x = 0; x < Mask_X_dim; x++) {
         for (unsigned int d = 0; d < Input_depth_dim; d++) {
-          for (unsigned int mm = m; mm < m + 8; mm++) {
+          for (unsigned int mm = m; mm < m + 8; mm+=2) {
             unsigned long long int old_subscript = mm * Mask_Y_dim * Mask_X_dim * Input_depth_dim
               + y * Mask_X_dim * Input_depth_dim
               + x * Input_depth_dim
@@ -2586,6 +2586,7 @@ int optimised_layerv14_omp_2blocks(const float* in_FP, const float* filter_FP, c
               + mm;
 
             filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+            filter_FP_copy[new_subscript+1] = filter_FP[old_subscript+(Mask_Y_dim * Mask_X_dim * Input_depth_dim)];
           }
         }
       }
