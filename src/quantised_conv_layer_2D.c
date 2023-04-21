@@ -55,7 +55,7 @@ int unoptimized_layer_Char(const unsigned char* in_Char, const signed char* filt
     }
   }
 
-  printf("\n from unopt %d %d ", out_to_compare_with_Char[0], out_to_compare_with_Char[1]);
+  printf("\n from quantised unopt %d %d ", out_to_compare_with_Char[0], out_to_compare_with_Char[1]);
   return 0;
 }
 
