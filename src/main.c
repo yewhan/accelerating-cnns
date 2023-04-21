@@ -18,7 +18,7 @@ The layer input parameters are specified in  void read_layer_dimensions().
 
 
 
-#define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
+// #define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
 
 
 
@@ -71,15 +71,14 @@ float* out_to_compare_with_FP; //pointer to output array to compare with
 float* bias_array_FP;
 
 
-#ifdef QUANTISATION
-  // quantised tensors
-  unsigned char* in_Char;                   // pointer to input array - char
-  unsigned char* out_Char;                  // pointer to output array - char
-  unsigned char* out_to_compare_with_Char;  // pointer to output array to compare with - char
-  signed char* filter_Char;                        // pointer to filter array - char
-  int* bias_array_Int;                      // pointer to bias array - int
-  // int_fast32_t* bias_array_Int;             // pointer to bias array - fast int of 32 bits
-#endif
+
+// quantised tensors
+unsigned char* in_Char;                   // pointer to input array - char
+unsigned char* out_Char;                  // pointer to output array - char
+unsigned char* out_to_compare_with_Char;  // pointer to output array to compare with - char
+signed char* filter_Char;                        // pointer to filter array - char
+int* bias_array_Int;                      // pointer to bias array - int
+// int_fast32_t* bias_array_Int;             // pointer to bias array - fast int of 32 bits
 
 
 
@@ -99,51 +98,61 @@ int main() {
   load_bias_FP();
   load_create_input_output_array_FP();
   load_filter_array_FP();
-  // Dr. Kelefouras' unoptimized layer taken as a base:
-  // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
-  // optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-  // optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-  // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-  // optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
-  // quantised function
-  unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+  #ifndef QUANTISATION
+    // Dr. Kelefouras' unoptimized layer taken as a base:
+    // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
+    // optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+
+
+  #else
+    // quantised function
+    unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+
+  #endif
 
 
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < 10; i++)
   {
-  // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv1_arraycopying_vectorised(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv2_unroll_x2(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv3_unroll_x4(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv4_unroll_m16(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv5_register_pressure_d(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv7_strength_reduction_d(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv9_unroll_d2(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv10_unroll_d4(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv11_unroll_d8(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv12_ops_outside_loop(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv13_arraycopying_sign_unsigned(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_FP);
-  // optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_FP);
-  // test(in_FP, filter_FP, bias_array_FP, out_FP);
 
+  #ifndef QUANTISATION
+    // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv1_arraycopying_vectorised(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv2_unroll_x2(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv3_unroll_x4(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv4_unroll_m16(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv5_register_pressure_d(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv7_strength_reduction_d(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv9_unroll_d2(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv10_unroll_d4(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv11_unroll_d8(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv12_ops_outside_loop(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv13_arraycopying_sign_unsigned(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_FP);
+  
+  
+  #else
 
+    // quantised functions
+    unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
 
-  // quantised functions
-  unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+  #endif
 
   }
 
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/1);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
@@ -398,16 +407,7 @@ int load_create_input_output_array_FP() {
 
 
 void deallocate_FP() {
-  #ifdef QUANTISATION
-    _mm_free(in_Char);
-    _mm_free(out_Char);
-
-    _mm_free(out_to_compare_with_Char);
-
-    _mm_free(bias_array_Int);
-
-    _mm_free(filter_Char);
-  #else
+  #ifndef QUANTISATION
     _mm_free(in_FP);
     _mm_free(out_FP);
 
@@ -416,6 +416,16 @@ void deallocate_FP() {
     _mm_free(bias_array_FP);
 
     _mm_free(filter_FP);
+    
+  #else
+    _mm_free(in_Char);
+    _mm_free(out_Char);
+
+    _mm_free(out_to_compare_with_Char);
+
+    _mm_free(bias_array_Int);
+
+    _mm_free(filter_Char);
   #endif
 
 }
