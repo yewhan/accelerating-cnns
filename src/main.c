@@ -106,11 +106,14 @@ int main() {
   // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
   // optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
+  // quantised function
+  unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+
 
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < 1; i++)
   {
   // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv1_arraycopying_vectorised(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -126,16 +129,21 @@ int main() {
   // optimised_layerv11_unroll_d8(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv12_ops_outside_loop(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv13_arraycopying_sign_unsigned(in_FP, filter_FP, bias_array_FP, out_FP);
-  optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_FP);
+  // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_FP);
   // optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_FP);
   // test(in_FP, filter_FP, bias_array_FP, out_FP);
+
+
+
+  // quantised functions
+  unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
 
   }
 
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/1);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
@@ -190,8 +198,8 @@ unsigned short int equal(float const a, float const b) {
 void read_layer_dimensions() {
 
 
-    Input_Output_batch_dim=2000;
-    // Input_Output_batch_dim=20;
+    // Input_Output_batch_dim=2000;
+    Input_Output_batch_dim=20;
     Input_Y_dim=54;
     Input_X_dim=54;
     Input_depth_dim=256;
