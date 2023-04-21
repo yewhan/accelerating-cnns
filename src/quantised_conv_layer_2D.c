@@ -5,7 +5,7 @@
 
 
 
-
+// 40 GFLOPS - test again after reboot just in-case
 int unoptimized_layer_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char) {
 
   int temp, bias;

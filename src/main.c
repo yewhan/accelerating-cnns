@@ -102,10 +102,10 @@ int main() {
   #ifndef QUANTISATION
     // Dr. Kelefouras' unoptimized layer taken as a base:
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
-    // optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layerv6_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
   #else
@@ -123,21 +123,21 @@ int main() {
 
   #ifndef QUANTISATION
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv1_arraycopying_vectorised(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv2_unroll_x2(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv3_unroll_x4(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv4_unroll_m16(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv5_register_pressure_d(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv6_register_pressure_x(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv7_strength_reduction_d(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv8_loop_tiling_m(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv9_unroll_d2(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv10_unroll_d4(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv11_unroll_d8(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv12_ops_outside_loop(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv13_arraycopying_sign_unsigned(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv14_omp_2blocks(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layerv15_omp_1block(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv1_arraycopying_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv3_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv4_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv5_register_pressure_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv6_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv7_strength_reduction_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv9_unroll_d2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv10_unroll_d4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv11_unroll_d8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv12_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv13_arraycopying_sign_unsigned_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
   
   
   #else
@@ -416,7 +416,7 @@ void deallocate_FP() {
     _mm_free(bias_array_FP);
 
     _mm_free(filter_FP);
-    
+
   #else
     _mm_free(in_Char);
     _mm_free(out_Char);
