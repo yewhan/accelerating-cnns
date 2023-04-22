@@ -52,6 +52,7 @@ int optimised_layerv15_omp_1block_FP(const float* in_FP, const float* filter_FP,
 int Relu_int(const int temp);
 
 int unoptimized_layer_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char);
+int optimised_layerv1_vectorised_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char);
 
 
 

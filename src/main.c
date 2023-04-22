@@ -18,7 +18,7 @@ The layer input parameters are specified in  void read_layer_dimensions().
 
 
 
-// #define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
+#define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
 
 
 
@@ -29,7 +29,12 @@ int load_filter_array_FP();
 void load_bias_FP();
 void deallocate_FP();
 void compare_output_result_FP();
-unsigned short int equal(float const a, float const b);
+unsigned short int equal_FP(float const a, float const b);
+
+void compare_output_result_Char();
+unsigned short int equal_Char(unsigned char const a, unsigned char const b);
+void deallocate_Char();
+
 
 
 //input dimensions
@@ -103,13 +108,13 @@ int main() {
     // Dr. Kelefouras' unoptimized layer taken as a base:
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
     // optimised_layerv6_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
   #else
-    // quantised function
+    // quantised functions
     unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
 
   #endif
@@ -118,7 +123,7 @@ int main() {
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < 100; i++)
   {
 
   #ifndef QUANTISATION
@@ -144,6 +149,7 @@ int main() {
 
     // quantised functions
     unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
 
   #endif
 
@@ -152,18 +158,22 @@ int main() {
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/100);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
   printf("\nGiga FLOPS achieved: %.0f\n", (double)FLOPS / 1000000000);//print Giga FLOPS
 
 
+  #ifndef QUANTISATION
   compare_output_result_FP();
-
 
   deallocate_FP();
 
+  #else
+  compare_output_result_Char();
+  deallocate_Char();
+  #endif
 
   return 0;
 }
@@ -172,13 +182,13 @@ int main() {
 void compare_output_result_FP() {
 
   for (unsigned long long int i = 0; i < (unsigned long long int) Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim; i++) {
-    if (equal(out_FP[i], out_to_compare_with_FP[i]) == 1) {
+    if (equal_FP(out_FP[i], out_to_compare_with_FP[i]) == 1) {
       printf("\n wrong values (%llu): %f %f", i, out_FP[i], out_to_compare_with_FP[i]);
     }
   }
 }
 
-unsigned short int equal(float const a, float const b) {
+unsigned short int equal_FP(float const a, float const b) {
   float temp = a - b;
 
   if (b == 0.0f) {//cannot divide with zero
@@ -201,6 +211,43 @@ unsigned short int equal(float const a, float const b) {
 }
 
 
+void compare_output_result_Char() {
+  for (unsigned long long int i = 0; i < (unsigned long long int) Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim; i++) {
+    if (equal_Char(out_Char[i], out_to_compare_with_Char[i]) == 1) {
+      printf("\n wrong values (%llu): %d %d", i, out_Char[i], out_to_compare_with_Char[i]);
+      int c = getchar();
+    }
+  }
+}
+
+unsigned short int equal_Char(unsigned char const a, unsigned char const b) {
+  // char temp = a - b;
+
+  if (a == b) {
+    return 0; //success
+  }
+  else {
+    return 1;
+  }
+
+  // if (b == 0) {//cannot divide with zero
+  //   if (a == 0) {
+  //     return 0;//success
+  //   }
+  //   else {
+  //     return 1;
+  //   }
+  // }
+  // else {
+
+  //   if (!(temp / b)) {
+  //     return 0; //success
+  //   }
+  //   else {
+  //     return 1;
+  //   }
+  // }
+}
 
 
 
@@ -407,17 +454,17 @@ int load_create_input_output_array_FP() {
 
 
 void deallocate_FP() {
-  #ifndef QUANTISATION
-    _mm_free(in_FP);
-    _mm_free(out_FP);
+  _mm_free(in_FP);
+  _mm_free(out_FP);
 
-    _mm_free(out_to_compare_with_FP);
+  _mm_free(out_to_compare_with_FP);
 
-    _mm_free(bias_array_FP);
+  _mm_free(bias_array_FP);
 
-    _mm_free(filter_FP);
+  _mm_free(filter_FP);
+}
 
-  #else
+void deallocate_Char() {
     _mm_free(in_Char);
     _mm_free(out_Char);
 
@@ -426,8 +473,6 @@ void deallocate_FP() {
     _mm_free(bias_array_Int);
 
     _mm_free(filter_Char);
-  #endif
-
 }
 
 
@@ -471,8 +516,11 @@ int load_filter_array_FP() {
             y * Mask_X_dim * Input_depth_dim +
             x * Input_depth_dim + d;
 
-          filter_FP[offset] = ((rand() % 8) + 0.973f);
-          filter_FP[offset + 1] = -((rand() % 8) + 0.973f);
+          // filter_FP[offset] = ((rand() % 8) + 0.973f);
+          // filter_FP[offset + 1] = -((rand() % 8) + 0.973f);
+
+          filter_FP[offset] = ((d % 8) + 0.973f);              // FOR DEBUGING *******************
+          filter_FP[offset + 1] = -((d % 8) + 0.973f);
           // printf("\n %d, %d",filter_FP[offset],filter_FP[offset+1]);
 
           #ifdef QUANTISATION
