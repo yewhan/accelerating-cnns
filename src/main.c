@@ -153,7 +153,8 @@ int main() {
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    // optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    optimised_layerv2_unroll_m2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
 
   #endif
 
