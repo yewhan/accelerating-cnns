@@ -322,6 +322,118 @@ int optimised_layerv1_vectorised_Char(const unsigned char* in_Char, const signed
 
 
 
+// register block/ unroll x by factor of 2 (x+=2)
+// 102 GFLOPS, 1.36x speedup from unopt
+int optimised_layerv2_unroll_x2_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char) {
+
+  int temp, temp2, bias;
+
+  for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+    for (unsigned int m = 0; m < Output_depth_dim; m++) { //channels
+      bias = bias_array_Int[m];
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        for (unsigned int x = 0; x < Output_X_dim; x+=2) {	//Output Width
+          __m256i temp_vec = _mm256_setzero_si256();
+          __m256i temp_vec2 = _mm256_setzero_si256();
+
+          for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+            for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+              for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                unsigned long long int in_subscript = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                + (x * Stride_X_dim + off_x) * Input_depth_dim
+                + d;
+
+              unsigned long long int in_subscript2 = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                + ((x+1) * Stride_X_dim + off_x) * Input_depth_dim
+                + d;
+
+                
+
+                unsigned long long int filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                + off_y * Mask_X_dim * Input_depth_dim
+                + off_x * Input_depth_dim
+                + d;
+
+
+                // __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
+                // __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
+                // temp_vec = _mm256_dpbsud_epi32(s, w, temp_vec);
+
+
+                __m256i s_l = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript]));
+                __m256i s_h = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript+16]));
+                __m256i s_l2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript2]));
+                __m256i s_h2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript2+16]));
+
+                __m256i w_l = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript]));
+                __m256i w_h = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript+16]));
+
+
+                __m256i inter_vec = _mm256_madd_epi16(s_l, w_l);
+                inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
+                temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
+
+                __m256i inter_vec2 = _mm256_add_epi16(s_l2, w_l);
+                inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
+                temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
+
+
+
+
+                // unsigned char s = in_Char[in_subscript];
+                // signed char w = filter_Char[filter_subscript];
+                // temp = temp + s * w;
+              }
+            }
+          }
+        
+          temp_vec = _mm256_hadd_epi32(temp_vec, temp_vec);
+          temp_vec = _mm256_hadd_epi32(temp_vec, temp_vec);
+          __m128i tempLo = _mm256_castsi256_si128(temp_vec);
+          __m128i tempHi = _mm256_extracti128_si256(temp_vec, 1);
+          __m128 sum = _mm_add_epi32(tempLo, tempHi);
+          temp = _mm_cvtsi128_si32(sum);
+
+          temp_vec2 = _mm256_hadd_epi32(temp_vec2, temp_vec2);
+          temp_vec2 = _mm256_hadd_epi32(temp_vec2, temp_vec2);
+          __m128i tempLo2 = _mm256_castsi256_si128(temp_vec2);
+          __m128i tempHi2 = _mm256_extracti128_si256(temp_vec2, 1);
+          __m128 sum2 = _mm_add_epi32(tempLo2, tempHi2);
+          temp2 = _mm_cvtsi128_si32(sum2);
+
+
+
+          temp += bias;
+          temp2 += bias;
+
+          unsigned long long int out_subscript = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+              y * (Output_depth_dim * Output_X_dim) +
+              x * Output_depth_dim
+              + m;
+            unsigned long long int out_subscript2 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+              y * (Output_depth_dim * Output_X_dim) +
+              (x+1) * Output_depth_dim
+              + m;
+
+          // temp += bias;
+          out_to_compare_with_Char[out_subscript] = Relu_int(temp);
+          out_to_compare_with_Char[out_subscript2] = Relu_int(temp2);
+
+        }
+      }
+    }
+  }
+
+  printf("\n from quantised v2 %d %d ", out_to_compare_with_Char[0], out_to_compare_with_Char[1]);
+  return 0;
+}
+
+
+
 
 
 // 40 GFLOPS, 20x speedup from non-quantised - test again after reboot just in-case

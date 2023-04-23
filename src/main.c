@@ -125,7 +125,7 @@ int main() {
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < 10; i++)
   {
 
   #ifndef QUANTISATION
@@ -152,7 +152,8 @@ int main() {
     // quantised functions
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    // optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
 
   #endif
 
@@ -161,7 +162,7 @@ int main() {
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/1);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
