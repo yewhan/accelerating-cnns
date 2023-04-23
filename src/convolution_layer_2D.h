@@ -1,8 +1,9 @@
 /*
 ------------------DR VASILIOS KELEFOURAS-----------------------------------------------------
-------------------COMP3001 ------------------------------------------------------------------
-------------------PARALLEL PROGAMMING MODULE-------------------------------------------------
 ------------------UNIVERSITY OF PLYMOUTH, SCHOOL OF ENGINEERING, COMPUTING AND MATHEMATICS---
+
+Altered by Euan Hughes
+
 */
 
 #ifndef CONVOLUTION_LAYER_CONVOLUTION_LAYER_2D_H
@@ -53,6 +54,7 @@ int Relu_int(const int temp);
 
 int unoptimized_layer_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char);
 int optimised_layerv1_vectorised_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char);
+int optimised_layerv1_arraycopying_vectorised_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char);
 
 
 
