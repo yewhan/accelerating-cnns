@@ -107,10 +107,10 @@ int main() {
 
   #ifndef QUANTISATION
     // Dr. Kelefouras' unoptimized layer taken as a base:
-    // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
+    unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
     // optimised_layerv6_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
@@ -131,7 +131,7 @@ int main() {
   #ifndef QUANTISATION
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv1_arraycopying_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layerv2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv3_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv4_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv5_register_pressure_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -144,7 +144,7 @@ int main() {
     // optimised_layerv12_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv13_arraycopying_sign_unsigned_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
   
   
   #else
@@ -153,9 +153,9 @@ int main() {
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    // optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv3_unroll_m2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    optimised_layerv4_general_register_pressure_d_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    // optimised_layerv4_general_register_pressure_d_Char(in_Char, filter_Char, bias_array_Int, out_Char);
 
   #endif
 
@@ -264,7 +264,7 @@ void read_layer_dimensions() {
     Input_Output_batch_dim=20;
     Input_Y_dim=54;
     Input_X_dim=54;
-    Input_depth_dim=256;
+    Input_depth_dim=128;
 
     Stride_Y_dim=1;
     Stride_X_dim=1;

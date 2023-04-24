@@ -293,13 +293,20 @@ int optimised_layerv1_vectorised_Char(const unsigned char* in_Char, const signed
               }
             }
           }
-        
-          __m256i temp1 = _mm256_hadd_epi32(temp_vec, temp_vec);
-          __m256i temp2 = _mm256_hadd_epi32(temp1, temp1);
-          __m128i tempLo = _mm256_castsi256_si128(temp2);
-          __m128i tempHi = _mm256_extracti128_si256(temp2, 1);
+
+          temp_vec = _mm256_hadd_epi32(temp_vec, temp_vec);
+          temp_vec = _mm256_hadd_epi32(temp_vec, temp_vec);
+          __m128i tempLo = _mm256_castsi256_si128(temp_vec);
+          __m128i tempHi = _mm256_extracti128_si256(temp_vec, 1);
           __m128 sum = _mm_add_epi32(tempLo, tempHi);
           temp = _mm_cvtsi128_si32(sum);
+
+          // __m256i temp1 = _mm256_hadd_epi32(temp_vec, temp_vec);
+          // __m256i temp2 = _mm256_hadd_epi32(temp1, temp1);
+          // __m128i tempLo = _mm256_castsi256_si128(temp2);
+          // __m128i tempHi = _mm256_extracti128_si256(temp2, 1);
+          // __m128 sum = _mm_add_epi32(tempLo, tempHi);
+          // temp = _mm_cvtsi128_si32(sum);
 
           temp += bias;
 
@@ -592,7 +599,7 @@ int optimised_layerv3_unroll_m2_Char(const unsigned char* in_Char, const signed 
 
 
 // reduce general register pressure in d loop
-// 123 GFLOPS, 1.03x speedup. still work to do with simd registers
+// 123 GFLOPS, 1.03x speedup
 int optimised_layerv4_general_register_pressure_d_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char) {
 
   int temp, temp2, temp3, temp4, bias, bias2;
@@ -743,6 +750,150 @@ int optimised_layerv4_general_register_pressure_d_Char(const unsigned char* in_C
   }
 
   printf("\n from quantised v4 %d %d ", out_to_compare_with_Char[0], out_to_compare_with_Char[1]);
+  return 0;
+}
+
+
+
+// reduce general register pressure in d loop
+// 123 GFLOPS, 1.03x speedup
+int optimised_layerv5_loop_tiling_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char) {
+
+  #define tile 32
+
+  int temp, temp2, temp3, temp4, bias, bias2;
+  for (unsigned int dd = 0; dd < Input_depth_dim; dd+=tile) {
+    for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+      for (unsigned int m = 0; m < Output_depth_dim; m+=2) { //channels
+        bias = bias_array_Int[m];
+        bias2 = bias_array_Int[m+1];
+
+        for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+          for (unsigned int x = 0; x < Output_X_dim; x+=2) {	//Output Width
+            __m256i temp_vec = _mm256_setzero_si256();
+            __m256i temp_vec2 = _mm256_setzero_si256();
+            __m256i temp_vec3 = _mm256_setzero_si256();
+            __m256i temp_vec4 = _mm256_setzero_si256();
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                for (unsigned int d = dd; d < dd + tile; d+=32) {
+
+                  unsigned long long int in_subscript = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                  + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                  + (x * Stride_X_dim + off_x) * Input_depth_dim
+                  + d;
+
+
+                  unsigned long long int filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
+
+
+                  __m256i s_l = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript]));
+                  __m256i s_h = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + 16]));
+                  __m256i s_l2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + Input_depth_dim]));
+                  __m256i s_h2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + Input_depth_dim + 16]));
+
+                  __m256i w_l = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript]));
+                  __m256i w_h = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + 16]));
+                  __m256i w_l2 = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + (Mask_Y_dim * Mask_X_dim * Input_depth_dim)]));
+                  __m256i w_h2 = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + (Mask_Y_dim * Mask_X_dim * Input_depth_dim) + 16]));
+
+
+                  __m256i inter_vec = _mm256_madd_epi16(s_l, w_l);
+                  inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
+                  temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
+
+                  __m256i inter_vec2 = _mm256_add_epi16(s_l2, w_l);
+                  inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
+                  temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
+
+                  __m256i inter_vec3 = _mm256_madd_epi16(s_l, w_l2);
+                  inter_vec3 = _mm256_add_epi32(inter_vec3, _mm256_madd_epi16(s_h, w_h2));
+                  temp_vec3 = _mm256_add_epi32(temp_vec3, inter_vec3);
+
+                  __m256i inter_vec4 = _mm256_add_epi16(s_l2, w_l2);
+                  inter_vec4 = _mm256_add_epi32(inter_vec4, _mm256_madd_epi16(s_h2, w_h2));
+                  temp_vec4 = _mm256_add_epi32(temp_vec4, inter_vec4);
+
+
+
+
+                  // unsigned char s = in_Char[in_subscript];
+                  // signed char w = filter_Char[filter_subscript];
+                  // temp = temp + s * w;
+                }
+              }
+            }
+          
+            temp_vec = _mm256_hadd_epi32(temp_vec, temp_vec);
+            temp_vec = _mm256_hadd_epi32(temp_vec, temp_vec);
+            __m128i tempLo = _mm256_castsi256_si128(temp_vec);
+            __m128i tempHi = _mm256_extracti128_si256(temp_vec, 1);
+            __m128 sum = _mm_add_epi32(tempLo, tempHi);
+            temp = _mm_cvtsi128_si32(sum);
+
+            temp_vec2 = _mm256_hadd_epi32(temp_vec2, temp_vec2);
+            temp_vec2 = _mm256_hadd_epi32(temp_vec2, temp_vec2);
+            __m128i tempLo2 = _mm256_castsi256_si128(temp_vec2);
+            __m128i tempHi2 = _mm256_extracti128_si256(temp_vec2, 1);
+            __m128 sum2 = _mm_add_epi32(tempLo2, tempHi2);
+            temp2 = _mm_cvtsi128_si32(sum2);
+          
+            temp_vec3 = _mm256_hadd_epi32(temp_vec3, temp_vec3);
+            temp_vec3 = _mm256_hadd_epi32(temp_vec3, temp_vec3);
+            __m128i tempLo3 = _mm256_castsi256_si128(temp_vec3);
+            __m128i tempHi3 = _mm256_extracti128_si256(temp_vec3, 1);
+            __m128 sum3 = _mm_add_epi32(tempLo3, tempHi3);
+            temp3 = _mm_cvtsi128_si32(sum3);
+
+            temp_vec4 = _mm256_hadd_epi32(temp_vec4, temp_vec4);
+            temp_vec4 = _mm256_hadd_epi32(temp_vec4, temp_vec4);
+            __m128i tempLo4 = _mm256_castsi256_si128(temp_vec4);
+            __m128i tempHi4 = _mm256_extracti128_si256(temp_vec4, 1);
+            __m128 sum4 = _mm_add_epi32(tempLo4, tempHi4);
+            temp4 = _mm_cvtsi128_si32(sum4);
+
+
+            temp += bias;
+            temp2 += bias;
+            temp3 += bias2;
+            temp4 += bias2;
+
+            unsigned long long int out_subscript = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+                y * (Output_depth_dim * Output_X_dim) +
+                x * Output_depth_dim
+                + m;
+              unsigned long long int out_subscript2 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+                y * (Output_depth_dim * Output_X_dim) +
+                (x+1) * Output_depth_dim
+                + m;
+
+            unsigned long long int out_subscript3 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+                y * (Output_depth_dim * Output_X_dim) +
+                x * Output_depth_dim
+                + (m+1);
+              unsigned long long int out_subscript4 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+                y * (Output_depth_dim * Output_X_dim) +
+                (x+1) * Output_depth_dim
+                + (m+1);
+
+
+            out_to_compare_with_Char[out_subscript] = Relu_int(temp);
+            out_to_compare_with_Char[out_subscript2] = Relu_int(temp2);
+
+            out_to_compare_with_Char[out_subscript3] = Relu_int(temp3);
+            out_to_compare_with_Char[out_subscript4] = Relu_int(temp4);
+
+          }
+        }
+      }
+    }
+  }
+
+  printf("\n from quantised v5 %d %d ", out_to_compare_with_Char[0], out_to_compare_with_Char[1]);
   return 0;
 }
 
