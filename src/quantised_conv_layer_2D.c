@@ -273,18 +273,12 @@ int optimised_layerv1_vectorised_Char(const unsigned char* in_Char, const signed
                 + d;
 
 
-                // __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
-                // __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
-                // temp_vec = _mm256_dpbsud_epi32(s, w, temp_vec);
+                __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
+                __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
 
-
-                __m256i s_l = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript]));
-                __m256i s_h = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript+16]));
-                __m256i w_l = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript]));
-                __m256i w_h = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript+16]));
-                __m256i inter_vec = _mm256_madd_epi16(s_l, w_l);
-                inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
-                temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
+                __m256i inter_vec = _mm256_maddubs_epi16(s,w);
+                inter_vec = _mm256_madd_epi16(inter_vec,_mm256_set1_epi16(1));  // widen inter_vec to 8, 32byte values to prevent overflow
+                temp_vec = _mm256_add_epi32(temp_vec,inter_vec);
 
 
                 // unsigned char s = in_Char[in_subscript];
@@ -358,7 +352,6 @@ int optimised_layerv2_unroll_x2_Char(const unsigned char* in_Char, const signed 
                 + ((x+1) * Stride_X_dim + off_x) * Input_depth_dim
                 + d;
 
-                
 
                 unsigned long long int filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
                 + off_y * Mask_X_dim * Input_depth_dim
@@ -366,28 +359,17 @@ int optimised_layerv2_unroll_x2_Char(const unsigned char* in_Char, const signed 
                 + d;
 
 
-                // __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
-                // __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
-                // temp_vec = _mm256_dpbsud_epi32(s, w, temp_vec);
+                __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
+                __m256i s2 = _mm256_load_si256((const __m256i*)&in_Char[in_subscript2]);
+                __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
 
+                __m256i inter_vec = _mm256_maddubs_epi16(s,w);
+                inter_vec = _mm256_madd_epi16(inter_vec,_mm256_set1_epi16(1));
+                temp_vec = _mm256_add_epi32(temp_vec,inter_vec);
 
-                __m256i s_l = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript]));
-                __m256i s_h = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript+16]));
-                __m256i s_l2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript2]));
-                __m256i s_h2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript2+16]));
-
-                __m256i w_l = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript]));
-                __m256i w_h = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript+16]));
-
-
-                __m256i inter_vec = _mm256_madd_epi16(s_l, w_l);
-                inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
-                temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
-
-                __m256i inter_vec2 = _mm256_madd_epi16(s_l2, w_l);
-                inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
-                temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
-
+                __m256i inter_vec2 = _mm256_maddubs_epi16(s2,w);
+                inter_vec2 = _mm256_madd_epi16(inter_vec2,_mm256_set1_epi16(1));
+                temp_vec2 = _mm256_add_epi32(temp_vec2,inter_vec2);
 
 
 
@@ -474,7 +456,6 @@ int optimised_layerv3_unroll_m2_Char(const unsigned char* in_Char, const signed 
                 + d;
 
                 
-
                 unsigned long long int filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
                 + off_y * Mask_X_dim * Input_depth_dim
                 + off_x * Input_depth_dim
@@ -486,38 +467,26 @@ int optimised_layerv3_unroll_m2_Char(const unsigned char* in_Char, const signed 
                 + d;
 
 
-                // __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
-                // __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
-                // temp_vec = _mm256_dpbsud_epi32(s, w, temp_vec);
+                __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
+                __m256i s2 = _mm256_load_si256((const __m256i*)&in_Char[in_subscript2]);
+                __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
+                __m256i w2 = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript2]);
 
+                __m256i inter_vec = _mm256_maddubs_epi16(s,w);
+                inter_vec = _mm256_madd_epi16(inter_vec,_mm256_set1_epi16(1));
+                temp_vec = _mm256_add_epi32(temp_vec,inter_vec);
 
-                __m256i s_l = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript]));
-                __m256i s_h = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript+16]));
-                __m256i s_l2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript2]));
-                __m256i s_h2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript2+16]));
+                __m256i inter_vec2 = _mm256_maddubs_epi16(s2,w);
+                inter_vec2 = _mm256_madd_epi16(inter_vec2,_mm256_set1_epi16(1));
+                temp_vec2 = _mm256_add_epi32(temp_vec2,inter_vec2);
 
-                __m256i w_l = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript]));
-                __m256i w_h = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript+16]));
-                __m256i w_l2 = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript2]));
-                __m256i w_h2 = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript2+16]));
+                __m256i inter_vec3 = _mm256_maddubs_epi16(s,w2);
+                inter_vec3 = _mm256_madd_epi16(inter_vec3,_mm256_set1_epi16(1));
+                temp_vec3 = _mm256_add_epi32(temp_vec3,inter_vec3);
 
-
-                __m256i inter_vec = _mm256_madd_epi16(s_l, w_l);
-                inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
-                temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
-
-                __m256i inter_vec2 = _mm256_madd_epi16(s_l2, w_l);
-                inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
-                temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
-
-                __m256i inter_vec3 = _mm256_madd_epi16(s_l, w_l2);
-                inter_vec3 = _mm256_add_epi32(inter_vec3, _mm256_madd_epi16(s_h, w_h2));
-                temp_vec3 = _mm256_add_epi32(temp_vec3, inter_vec3);
-
-                __m256i inter_vec4 = _mm256_madd_epi16(s_l2, w_l2);
-                inter_vec4 = _mm256_add_epi32(inter_vec4, _mm256_madd_epi16(s_h2, w_h2));
-                temp_vec4 = _mm256_add_epi32(temp_vec4, inter_vec4);
-
+                __m256i inter_vec4 = _mm256_maddubs_epi16(s2,w2);
+                inter_vec4 = _mm256_madd_epi16(inter_vec4,_mm256_set1_epi16(1));
+                temp_vec4 = _mm256_add_epi32(temp_vec4,inter_vec4);
 
 
 
@@ -648,33 +617,26 @@ int optimised_layerv4_general_register_pressure_d_Char(const unsigned char* in_C
                 // temp_vec = _mm256_dpbsud_epi32(s, w, temp_vec);
 
 
-                __m256i s_l = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript]));
-                __m256i s_h = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + 16]));
-                __m256i s_l2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + Input_depth_dim]));
-                __m256i s_h2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + Input_depth_dim + 16]));
+                __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
+                __m256i s2 = _mm256_load_si256((const __m256i*)&in_Char[in_subscript + Input_depth_dim]);
+                __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
+                __m256i w2 = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript + (Mask_Y_dim * Mask_X_dim * Input_depth_dim)]);
 
-                __m256i w_l = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript]));
-                __m256i w_h = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + 16]));
-                __m256i w_l2 = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + (Mask_Y_dim * Mask_X_dim * Input_depth_dim)]));
-                __m256i w_h2 = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + (Mask_Y_dim * Mask_X_dim * Input_depth_dim) + 16]));
+                __m256i inter_vec = _mm256_maddubs_epi16(s,w);
+                inter_vec = _mm256_madd_epi16(inter_vec,_mm256_set1_epi16(1));
+                temp_vec = _mm256_add_epi32(temp_vec,inter_vec);
 
+                __m256i inter_vec2 = _mm256_maddubs_epi16(s2,w);
+                inter_vec2 = _mm256_madd_epi16(inter_vec2,_mm256_set1_epi16(1));
+                temp_vec2 = _mm256_add_epi32(temp_vec2,inter_vec2);
 
-                __m256i inter_vec = _mm256_madd_epi16(s_l, w_l);
-                inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
-                temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
+                __m256i inter_vec3 = _mm256_maddubs_epi16(s,w2);
+                inter_vec3 = _mm256_madd_epi16(inter_vec3,_mm256_set1_epi16(1));
+                temp_vec3 = _mm256_add_epi32(temp_vec3,inter_vec3);
 
-                __m256i inter_vec2 = _mm256_madd_epi16(s_l2, w_l);
-                inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
-                temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
-
-                __m256i inter_vec3 = _mm256_madd_epi16(s_l, w_l2);
-                inter_vec3 = _mm256_add_epi32(inter_vec3, _mm256_madd_epi16(s_h, w_h2));
-                temp_vec3 = _mm256_add_epi32(temp_vec3, inter_vec3);
-
-                __m256i inter_vec4 = _mm256_madd_epi16(s_l2, w_l2);
-                inter_vec4 = _mm256_add_epi32(inter_vec4, _mm256_madd_epi16(s_h2, w_h2));
-                temp_vec4 = _mm256_add_epi32(temp_vec4, inter_vec4);
-
+                __m256i inter_vec4 = _mm256_maddubs_epi16(s2,w2);
+                inter_vec4 = _mm256_madd_epi16(inter_vec4,_mm256_set1_epi16(1));
+                temp_vec4 = _mm256_add_epi32(temp_vec4,inter_vec4);
 
 
 
@@ -791,32 +753,26 @@ int optimised_layerv5_loop_tiling_Char(const unsigned char* in_Char, const signe
                   + d;
 
 
-                  __m256i s_l = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript]));
-                  __m256i s_h = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + 16]));
-                  __m256i s_l2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + Input_depth_dim]));
-                  __m256i s_h2 = _mm256_cvtepu8_epi16(_mm_load_si128((const __m128i*)&in_Char[in_subscript + Input_depth_dim + 16]));
+                __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
+                __m256i s2 = _mm256_load_si256((const __m256i*)&in_Char[in_subscript + Input_depth_dim]);
+                __m256i w = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript]);
+                __m256i w2 = _mm256_load_si256((const __m256i*)&filter_Char[filter_subscript + (Mask_Y_dim * Mask_X_dim * Input_depth_dim)]);
 
-                  __m256i w_l = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript]));
-                  __m256i w_h = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + 16]));
-                  __m256i w_l2 = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + (Mask_Y_dim * Mask_X_dim * Input_depth_dim)]));
-                  __m256i w_h2 = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript + (Mask_Y_dim * Mask_X_dim * Input_depth_dim) + 16]));
+                __m256i inter_vec = _mm256_maddubs_epi16(s,w);
+                inter_vec = _mm256_madd_epi16(inter_vec,_mm256_set1_epi16(1));
+                temp_vec = _mm256_add_epi32(temp_vec,inter_vec);
 
+                __m256i inter_vec2 = _mm256_maddubs_epi16(s2,w);
+                inter_vec2 = _mm256_madd_epi16(inter_vec2,_mm256_set1_epi16(1));
+                temp_vec2 = _mm256_add_epi32(temp_vec2,inter_vec2);
 
-                  __m256i inter_vec = _mm256_madd_epi16(s_l, w_l);
-                  inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
-                  temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
+                __m256i inter_vec3 = _mm256_maddubs_epi16(s,w2);
+                inter_vec3 = _mm256_madd_epi16(inter_vec3,_mm256_set1_epi16(1));
+                temp_vec3 = _mm256_add_epi32(temp_vec3,inter_vec3);
 
-                  __m256i inter_vec2 = _mm256_madd_epi16(s_l2, w_l);
-                  inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
-                  temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
-
-                  __m256i inter_vec3 = _mm256_madd_epi16(s_l, w_l2);
-                  inter_vec3 = _mm256_add_epi32(inter_vec3, _mm256_madd_epi16(s_h, w_h2));
-                  temp_vec3 = _mm256_add_epi32(temp_vec3, inter_vec3);
-
-                  __m256i inter_vec4 = _mm256_madd_epi16(s_l2, w_l2);
-                  inter_vec4 = _mm256_add_epi32(inter_vec4, _mm256_madd_epi16(s_h2, w_h2));
-                  temp_vec4 = _mm256_add_epi32(temp_vec4, inter_vec4);
+                __m256i inter_vec4 = _mm256_maddubs_epi16(s2,w2);
+                inter_vec4 = _mm256_madd_epi16(inter_vec4,_mm256_set1_epi16(1));
+                temp_vec4 = _mm256_add_epi32(temp_vec4,inter_vec4);
 
 
 

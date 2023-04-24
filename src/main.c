@@ -116,8 +116,8 @@ int main() {
 
   #else
     // quantised functions
-    // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
-    optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+    unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+    // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
 
   #endif
 
@@ -153,9 +153,9 @@ int main() {
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    // optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv3_unroll_m2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    // optimised_layerv4_general_register_pressure_d_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    optimised_layerv4_general_register_pressure_d_Char(in_Char, filter_Char, bias_array_Int, out_Char);
 
   #endif
 
