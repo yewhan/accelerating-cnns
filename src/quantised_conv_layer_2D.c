@@ -384,7 +384,7 @@ int optimised_layerv2_unroll_x2_Char(const unsigned char* in_Char, const signed 
                 inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
                 temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
 
-                __m256i inter_vec2 = _mm256_add_epi16(s_l2, w_l);
+                __m256i inter_vec2 = _mm256_madd_epi16(s_l2, w_l);
                 inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
                 temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
 
@@ -506,7 +506,7 @@ int optimised_layerv3_unroll_m2_Char(const unsigned char* in_Char, const signed 
                 inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
                 temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
 
-                __m256i inter_vec2 = _mm256_add_epi16(s_l2, w_l);
+                __m256i inter_vec2 = _mm256_madd_epi16(s_l2, w_l);
                 inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
                 temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
 
@@ -514,7 +514,7 @@ int optimised_layerv3_unroll_m2_Char(const unsigned char* in_Char, const signed 
                 inter_vec3 = _mm256_add_epi32(inter_vec3, _mm256_madd_epi16(s_h, w_h2));
                 temp_vec3 = _mm256_add_epi32(temp_vec3, inter_vec3);
 
-                __m256i inter_vec4 = _mm256_add_epi16(s_l2, w_l2);
+                __m256i inter_vec4 = _mm256_madd_epi16(s_l2, w_l2);
                 inter_vec4 = _mm256_add_epi32(inter_vec4, _mm256_madd_epi16(s_h2, w_h2));
                 temp_vec4 = _mm256_add_epi32(temp_vec4, inter_vec4);
 
@@ -663,7 +663,7 @@ int optimised_layerv4_general_register_pressure_d_Char(const unsigned char* in_C
                 inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
                 temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
 
-                __m256i inter_vec2 = _mm256_add_epi16(s_l2, w_l);
+                __m256i inter_vec2 = _mm256_madd_epi16(s_l2, w_l);
                 inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
                 temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
 
@@ -671,7 +671,7 @@ int optimised_layerv4_general_register_pressure_d_Char(const unsigned char* in_C
                 inter_vec3 = _mm256_add_epi32(inter_vec3, _mm256_madd_epi16(s_h, w_h2));
                 temp_vec3 = _mm256_add_epi32(temp_vec3, inter_vec3);
 
-                __m256i inter_vec4 = _mm256_add_epi16(s_l2, w_l2);
+                __m256i inter_vec4 = _mm256_madd_epi16(s_l2, w_l2);
                 inter_vec4 = _mm256_add_epi32(inter_vec4, _mm256_madd_epi16(s_h2, w_h2));
                 temp_vec4 = _mm256_add_epi32(temp_vec4, inter_vec4);
 
@@ -806,7 +806,7 @@ int optimised_layerv5_loop_tiling_Char(const unsigned char* in_Char, const signe
                   inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
                   temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
 
-                  __m256i inter_vec2 = _mm256_add_epi16(s_l2, w_l);
+                  __m256i inter_vec2 = _mm256_madd_epi16(s_l2, w_l);
                   inter_vec2 = _mm256_add_epi32(inter_vec2, _mm256_madd_epi16(s_h2, w_h));
                   temp_vec2 = _mm256_add_epi32(temp_vec2, inter_vec2);
 
@@ -814,7 +814,7 @@ int optimised_layerv5_loop_tiling_Char(const unsigned char* in_Char, const signe
                   inter_vec3 = _mm256_add_epi32(inter_vec3, _mm256_madd_epi16(s_h, w_h2));
                   temp_vec3 = _mm256_add_epi32(temp_vec3, inter_vec3);
 
-                  __m256i inter_vec4 = _mm256_add_epi16(s_l2, w_l2);
+                  __m256i inter_vec4 = _mm256_madd_epi16(s_l2, w_l2);
                   inter_vec4 = _mm256_add_epi32(inter_vec4, _mm256_madd_epi16(s_h2, w_h2));
                   temp_vec4 = _mm256_add_epi32(temp_vec4, inter_vec4);
 
