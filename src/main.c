@@ -19,7 +19,7 @@ The layer input parameters are specified in  void read_layer_dimensions().
 
 
 
-#define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
+// #define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
 
 
 
@@ -107,16 +107,16 @@ int main() {
 
   #ifndef QUANTISATION
     // Dr. Kelefouras' unoptimized layer taken as a base:
-    unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
+    // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
     // optimised_layerv6_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
   #else
     // quantised functions
-    unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+    // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
     // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
 
   #endif
@@ -125,13 +125,13 @@ int main() {
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < 1; i++)
   {
 
   #ifndef QUANTISATION
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv1_arraycopying_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layerv2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layerv2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv3_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv4_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv5_register_pressure_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -144,7 +144,7 @@ int main() {
     // optimised_layerv12_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv13_arraycopying_sign_unsigned_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
   
   
   #else
@@ -152,10 +152,10 @@ int main() {
     // quantised functions
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    // optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv3_unroll_m2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    optimised_layerv4_general_register_pressure_d_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    // optimised_layerv4_general_register_pressure_d_Char(in_Char, filter_Char, bias_array_Int, out_Char);
 
   #endif
 
@@ -164,7 +164,7 @@ int main() {
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/1);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
