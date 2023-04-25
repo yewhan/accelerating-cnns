@@ -2533,7 +2533,7 @@ int optimised_layerv14_omp_2blocks_FP(const float* in_FP, const float* filter_FP
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
-  #pragma omp parallel for collapse(4) schedule(static)
+  #pragma omp parallel for collapse(3) schedule(static)
     for (unsigned int y = 0; y < Mask_Y_dim; y++) {
       for (unsigned int x = 0; x < Mask_X_dim; x++) {
         for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -2852,7 +2852,7 @@ int optimised_layerv15_omp_1block_FP(const float* in_FP, const float* filter_FP,
   {
 
     // array copying - filter_FP into form usable for vectorising m loop
-    #pragma omp for collapse(4) schedule(static)
+    #pragma omp for collapse(3) schedule(static)
       for (unsigned int y = 0; y < Mask_Y_dim; y++) {
         for (unsigned int x = 0; x < Mask_X_dim; x++) {
           for (unsigned int d = 0; d < Input_depth_dim; d++) {
