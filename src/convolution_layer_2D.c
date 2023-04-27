@@ -1453,7 +1453,7 @@ int optimised_layer_v10_AC_unroll_d4_FP(const float* in_FP, const float* filter_
                   temp5 = _mm256_fmadd_ps(s, w2, temp5);
                   temp6 = _mm256_fmadd_ps(s2, w2, temp6);
                   temp7 = _mm256_fmadd_ps(s3, w2, temp7);
-                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);#
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
 
 
                   // __________________________________________________________________________
