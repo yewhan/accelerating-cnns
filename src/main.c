@@ -108,10 +108,10 @@ int main() {
   #ifndef QUANTISATION
     // Dr. Kelefouras' unoptimized layer taken as a base:
     unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
-    // optimised_layerv6_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layer_v6_AC_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layer_v8_AC_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layer_v14_AC_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layer_v15_AC_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
   #else
@@ -125,7 +125,7 @@ int main() {
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < 10; i++)
   {
 
   #ifndef QUANTISATION
@@ -134,6 +134,7 @@ int main() {
     //vectorised d loop
     // optimised_layer_v1_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v1_vectorised_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
     // vectorised m loop, AKA array copying functions
@@ -151,7 +152,7 @@ int main() {
     // optimised_layer_v12_AC_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v13_AC_sign_unsigned_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v14_AC_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v15_AC_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v15_AC_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
   
   
   #else
@@ -171,7 +172,7 @@ int main() {
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/1);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs

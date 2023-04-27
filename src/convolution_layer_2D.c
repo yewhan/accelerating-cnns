@@ -7,6 +7,7 @@
 
 
 // vectorised d loop, using hadd instructions
+// 23 GFLOPS
 int optimised_layer_v1_vectorised_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
   float bias;
   __m256 temp;
@@ -73,8 +74,8 @@ int optimised_layer_v1_vectorised_FP(const float* in_FP, const float* filter_FP,
 }
 
 
-
 // vectorised d loop, optimised hadd
+// 23 GFLOPS, compare again after all optimisations applied
 int optimised_layer_v1_vectorised_opt_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
   float bias;
   __m256 temp;
@@ -145,6 +146,108 @@ int optimised_layer_v1_vectorised_opt_FP(const float* in_FP, const float* filter
 }
 
 
+// vectorised d loop, optimised hadd
+// ~42 GFLOPS
+int optimised_layer_v2_unroll_x2_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  float bias;
+  __m256 temp, temp2;
+
+  for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+    for (unsigned int m = 0; m < Output_depth_dim; m++) { //channels
+      bias = bias_array_FP[m];
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        for (unsigned int x = 0; x < Output_X_dim; x+=2) {	//Output Width
+          temp = _mm256_setzero_ps();
+          temp2 = _mm256_setzero_ps();
+          // temp = 0.0f;
+
+          for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+            for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+              for (unsigned int d = 0; d < Input_depth_dim; d+=8) {
+
+                unsigned long long int in_subscript = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                  + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                  + (x * Stride_X_dim + off_x) * Input_depth_dim
+                  + d;
+                unsigned long long int in_subscript2 = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                  + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                  + ((x+1) * Stride_X_dim + off_x) * Input_depth_dim
+                  + d;
+
+
+                unsigned long long int filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
+
+                __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                __m256 s2 = _mm256_load_ps(&in_FP[in_subscript2]);
+
+                __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+
+                temp = _mm256_add_ps(temp, _mm256_mul_ps(s, w));
+                temp2 = _mm256_add_ps(temp2, _mm256_mul_ps(s2, w));
+
+
+                // float s = in_FP[in_subscript];
+                // float w = filter_FP[filter_subscript];
+                // temp = temp + s * w;
+              }
+            }
+          }
+
+
+          unsigned long long int out_subscript = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            x * Output_depth_dim
+            + m;
+          unsigned long long int out_subscript2 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            (x+1) * Output_depth_dim
+            + m;
+
+          __m128 sseLo = _mm256_castps256_ps128(temp);
+          __m128 sseHi = _mm256_extractf128_ps(temp, 1);
+          sseLo = _mm_add_ps(sseLo, sseHi);
+
+          __m128 sseShuf = _mm_movehdup_ps(sseLo);
+          __m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+          sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+          sseSum = _mm_add_ss(sseSum, sseShuf);
+
+          float sum = _mm_cvtss_f32(sseSum);
+
+          sum += bias;
+          out_to_compare_with_FP[out_subscript] = Relu_float(sum);
+
+
+          __m128 sseLo2 = _mm256_castps256_ps128(temp2);
+          __m128 sseHi2 = _mm256_extractf128_ps(temp2, 1);
+          sseLo2 = _mm_add_ps(sseLo2, sseHi2);
+
+          __m128 sseShuf2 = _mm_movehdup_ps(sseLo2);
+          __m128 sseSum2 = _mm_add_ps(sseLo2, sseShuf2);
+          sseShuf2 = _mm_movehl_ps(sseShuf2, sseSum2);
+          sseSum2 = _mm_add_ss(sseSum2, sseShuf2);
+          
+          float sum2 = _mm_cvtss_f32(sseSum2);
+
+          sum2 += bias;
+          out_to_compare_with_FP[out_subscript2] = Relu_float(sum2);
+
+
+
+
+        }
+      }
+    }
+  }
+
+  printf("\n from optv2 x2 %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  return 0;
+}
+
 
 
 
@@ -169,6 +272,7 @@ int optimised_layer_v1_AC_vectorised_FP(const float* in_FP, const float* filter_
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -178,12 +282,13 @@ int optimised_layer_v1_AC_vectorised_FP(const float* in_FP, const float* filter_
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -261,6 +366,7 @@ int optimised_layer_v2_AC_unroll_x2_FP(const float* in_FP, const float* filter_F
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -270,12 +376,13 @@ int optimised_layer_v2_AC_unroll_x2_FP(const float* in_FP, const float* filter_F
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -371,6 +478,7 @@ int optimised_layer_v3_AC_unroll_x4_FP(const float* in_FP, const float* filter_F
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -380,12 +488,13 @@ int optimised_layer_v3_AC_unroll_x4_FP(const float* in_FP, const float* filter_F
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -510,6 +619,7 @@ int optimised_layer_v4_AC_unroll_m16_FP(const float* in_FP, const float* filter_
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -519,12 +629,13 @@ int optimised_layer_v4_AC_unroll_m16_FP(const float* in_FP, const float* filter_
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -697,6 +808,7 @@ int optimised_layer_v5_AC_register_pressure_d_FP(const float* in_FP, const float
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -706,12 +818,13 @@ int optimised_layer_v5_AC_register_pressure_d_FP(const float* in_FP, const float
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -884,6 +997,7 @@ int optimised_layer_v6_AC_register_pressure_x_FP(const float* in_FP, const float
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -893,12 +1007,13 @@ int optimised_layer_v6_AC_register_pressure_x_FP(const float* in_FP, const float
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -1075,6 +1190,7 @@ int optimised_layer_v7_AC_strength_reduction_d_FP(const float* in_FP, const floa
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -1084,12 +1200,13 @@ int optimised_layer_v7_AC_strength_reduction_d_FP(const float* in_FP, const floa
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -1220,6 +1337,7 @@ int optimised_layer_v8_AC_loop_tiling_m_FP(const float* in_FP, const float* filt
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -1229,12 +1347,13 @@ int optimised_layer_v8_AC_loop_tiling_m_FP(const float* in_FP, const float* filt
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -1365,6 +1484,7 @@ int optimised_layer_v9_AC_unroll_d2_FP(const float* in_FP, const float* filter_F
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -1374,12 +1494,13 @@ int optimised_layer_v9_AC_unroll_d2_FP(const float* in_FP, const float* filter_F
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -1530,6 +1651,7 @@ int optimised_layer_v10_AC_unroll_d4_FP(const float* in_FP, const float* filter_
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -1539,12 +1661,13 @@ int optimised_layer_v10_AC_unroll_d4_FP(const float* in_FP, const float* filter_
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -1741,6 +1864,7 @@ int optimised_layer_v11_AC_unroll_d8_FP(const float* in_FP, const float* filter_
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -1750,12 +1874,13 @@ int optimised_layer_v11_AC_unroll_d8_FP(const float* in_FP, const float* filter_
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -2054,6 +2179,7 @@ int optimised_layer_v12_AC_ops_outside_loop_FP(const float* in_FP, const float* 
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -2063,12 +2189,13 @@ int optimised_layer_v12_AC_ops_outside_loop_FP(const float* in_FP, const float* 
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
@@ -2367,6 +2494,7 @@ int optimised_layer_v13_AC_sign_unsigned_FP(const float* in_FP, const float* fil
   }
 
   // array copying - filter_FP into form usable for vectorising m loop
+  unsigned long long int new_subscript = 0;
   for (unsigned int y = 0; y < Mask_Y_dim; y++) {
     for (unsigned int x = 0; x < Mask_X_dim; x++) {
       for (unsigned int d = 0; d < Input_depth_dim; d++) {
@@ -2376,12 +2504,13 @@ int optimised_layer_v13_AC_sign_unsigned_FP(const float* in_FP, const float* fil
             + x * Input_depth_dim
             + d;
               
-          unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-            + x * Input_depth_dim * Output_depth_dim
-            + d * Output_depth_dim
-            + m;
+          // unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+          //   + x * Input_depth_dim * Output_depth_dim
+          //   + d * Output_depth_dim
+          //   + m;
 
           filter_FP_copy[new_subscript] = filter_FP[old_subscript];
+          new_subscript++;
         }
       }
     }
