@@ -19,7 +19,7 @@ The layer input parameters are specified in  void read_layer_dimensions().
 
 
 
-// #define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
+#define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
 
 
 
@@ -107,17 +107,17 @@ int main() {
 
   #ifndef QUANTISATION
     // Dr. Kelefouras' unoptimized layer taken as a base:
-    // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
+    unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
     // optimised_layerv6_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
   #else
     // quantised functions
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
-    // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+    optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
 
   #endif
 
@@ -130,21 +130,21 @@ int main() {
 
   #ifndef QUANTISATION
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv1_arraycopying_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv3_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv4_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv5_register_pressure_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv6_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv7_strength_reduction_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv8_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv9_unroll_d2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv10_unroll_d4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv11_unroll_d8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv12_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv13_arraycopying_sign_unsigned_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layerv14_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layerv15_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v1_AC_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v3_AC_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v4_AC_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v5_AC_register_pressure_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v6_AC_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v7_AC_strength_reduction_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v8_AC_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v9_AC_unroll_d2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v10_AC_unroll_d4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v11_AC_unroll_d8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v12_AC_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v13_AC_sign_unsigned_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v14_AC_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v15_AC_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
   
   
   #else
@@ -221,7 +221,7 @@ void compare_output_result_Char() {
   for (unsigned long long int i = 0; i < (unsigned long long int) Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim; i++) {
     if (equal_Char(out_Char[i], out_to_compare_with_Char[i]) == 1) {
       printf("\n wrong values (%llu): %d %d", i, out_Char[i], out_to_compare_with_Char[i]);
-      int c = getchar();
+      // int c = getchar();
     }
   }
 }
@@ -264,7 +264,7 @@ void read_layer_dimensions() {
     Input_Output_batch_dim=20;
     Input_Y_dim=54;
     Input_X_dim=54;
-    Input_depth_dim=128;
+    Input_depth_dim=256;
 
     Stride_Y_dim=1;
     Stride_X_dim=1;
@@ -520,11 +520,11 @@ int load_filter_array_FP() {
             y * Mask_X_dim * Input_depth_dim +
             x * Input_depth_dim + d;
 
-          // filter_FP[offset] = ((rand() % 8) + 0.973f);
-          // filter_FP[offset + 1] = -((rand() % 8) + 0.973f);
+          filter_FP[offset] = ((rand() % 8) + 0.973f);
+          filter_FP[offset + 1] = -((rand() % 8) + 0.973f);
 
-          filter_FP[offset] = ((d % 8) + 0.973f);              // FOR DEBUGING *******************
-          filter_FP[offset + 1] = -((d % 8) + 0.973f);
+          // filter_FP[offset] = ((d % 8) + 0.973f);              // FOR DEBUGING *******************
+          // filter_FP[offset + 1] = -((d % 8) + 0.973f);
           // printf("\n %d, %d",filter_FP[offset],filter_FP[offset+1]);
 
           #ifdef QUANTISATION
