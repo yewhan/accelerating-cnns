@@ -138,7 +138,8 @@ int main() {
     // optimised_layer_v2_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x4_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x8_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v2_unroll_m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v2_unroll_m4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
     // vectorised m loop, AKA array copying functions
