@@ -19,7 +19,7 @@ The layer input parameters are specified in  void read_layer_dimensions().
 
 
 
-#define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
+// #define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
 
 
 
@@ -130,6 +130,13 @@ int main() {
 
   #ifndef QUANTISATION
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
+    //vectorised d loop
+    // optimised_layer_v1_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v1_vectorised_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
+
+    // vectorised m loop, AKA array copying functions
     // optimised_layer_v1_AC_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_AC_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v3_AC_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
