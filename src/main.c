@@ -134,7 +134,8 @@ int main() {
     //vectorised d loop
     // optimised_layer_v1_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v1_vectorised_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v2_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
     // vectorised m loop, AKA array copying functions
