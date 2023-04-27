@@ -776,6 +776,106 @@ int optimised_layer_v2_unroll_x8_hadd_FP(const float* in_FP, const float* filter
 }
 
 
+// unrolled m loop by 2
+// ~42 GFLOPS
+int optimised_layer_v2_unroll_m2_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  float bias, bias2;
+  __m256 temp, temp2;
+
+  for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+    for (unsigned int m = 0; m < Output_depth_dim; m+=2) { //channels
+      bias = bias_array_FP[m];
+      bias2 = bias_array_FP[m+1];
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        for (unsigned int x = 0; x < Output_X_dim; x++) {	//Output Width
+          temp = _mm256_setzero_ps();
+          temp2 = _mm256_setzero_ps();
+          // temp = 0.0f;
+
+          for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+            for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+              for (unsigned int d = 0; d < Input_depth_dim; d+=8) {
+
+                unsigned long long int in_subscript = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                  + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                  + (x * Stride_X_dim + off_x) * Input_depth_dim
+                  + d;
+
+                unsigned long long int filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
+                unsigned long long int filter_subscript2 = (m+1) * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
+
+                __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript2]);
+
+                temp = _mm256_add_ps(temp, _mm256_mul_ps(s, w));
+                temp2 = _mm256_add_ps(temp2, _mm256_mul_ps(s, w2));
+
+
+                // float s = in_FP[in_subscript];
+                // float w = filter_FP[filter_subscript];
+                // temp = temp + s * w;
+              }
+            }
+          }
+
+
+          unsigned long long int out_subscript = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            x * Output_depth_dim
+            + m;
+          unsigned long long int out_subscript2 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            x * Output_depth_dim
+            + (m+1);
+
+
+          __m128 sseLo = _mm256_castps256_ps128(temp);
+          __m128 sseHi = _mm256_extractf128_ps(temp, 1);
+          sseLo = _mm_add_ps(sseLo, sseHi);
+
+          __m128 sseShuf = _mm_movehdup_ps(sseLo);
+          __m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+          sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+          sseSum = _mm_add_ss(sseSum, sseShuf);
+
+          float sum = _mm_cvtss_f32(sseSum);
+
+          sum += bias;
+          out_to_compare_with_FP[out_subscript] = Relu_float(sum);
+
+
+          __m128 sseLo2 = _mm256_castps256_ps128(temp2);
+          __m128 sseHi2 = _mm256_extractf128_ps(temp2, 1);
+          sseLo2 = _mm_add_ps(sseLo2, sseHi2);
+
+          __m128 sseShuf2 = _mm_movehdup_ps(sseLo2);
+          __m128 sseSum2 = _mm_add_ps(sseLo2, sseShuf2);
+          sseShuf2 = _mm_movehl_ps(sseShuf2, sseSum2);
+          sseSum2 = _mm_add_ss(sseSum2, sseShuf2);
+          
+          float sum2 = _mm_cvtss_f32(sseSum2);
+
+          sum2 += bias2;
+          out_to_compare_with_FP[out_subscript2] = Relu_float(sum2);
+
+        }
+      }
+    }
+  }
+
+  printf("\n from optv1 hadd %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  return 0;
+}
+
+
 
 
 
