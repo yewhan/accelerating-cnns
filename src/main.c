@@ -88,7 +88,7 @@ int* bias_array_Int;                      // pointer to bias array - int
 
 
 
-#define EPSILON 0.01
+#define EPSILON 0.001
 
 
 
@@ -144,7 +144,8 @@ int main() {
     // optimised_layer_v2_unroll_m8_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x2m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x2m2_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v2_unroll_x4m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_x4m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v2_unroll_x4m2_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
 
