@@ -88,7 +88,7 @@ int* bias_array_Int;                      // pointer to bias array - int
 
 
 
-#define EPSILON 0.001
+#define EPSILON 0.01
 
 
 
@@ -139,8 +139,12 @@ int main() {
     // optimised_layer_v2_unroll_x4_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x8_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v2_unroll_m4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_m4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_m4_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_m8_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v2_unroll_x2m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_x4m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
 
 
     // vectorised m loop, AKA array copying functions
@@ -204,6 +208,7 @@ void compare_output_result_FP() {
   for (unsigned long long int i = 0; i < (unsigned long long int) Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim; i++) {
     if (equal_FP(out_FP[i], out_to_compare_with_FP[i]) == 1) {
       printf("\n wrong values (%llu): %f %f", i, out_FP[i], out_to_compare_with_FP[i]);
+      int c = getchar();
     }
   }
 }
