@@ -131,7 +131,7 @@ int main() {
   #ifndef QUANTISATION
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
-    //vectorised d loop
+    // ***** vectorised d loop *****
     // optimised_layer_v1_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v1_vectorised_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -145,12 +145,14 @@ int main() {
     // optimised_layer_v2_unroll_x2m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x2m2_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x4m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v2_unroll_x4m2_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_x4m2_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x2m4_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_x4m2_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
 
-    // vectorised m loop, AKA array copying functions
+    // ***** vectorised m loop, AKA array copying functions *****
     // optimised_layer_v1_AC_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_AC_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v3_AC_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -170,7 +172,7 @@ int main() {
   
   #else
 
-    // quantised functions
+    // ***** quantised functions *****
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
     optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
