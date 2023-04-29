@@ -152,6 +152,7 @@ int main() {
     // optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x3m3_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     optimised_layer_v2_unroll_x3m3_hadd_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v3_unroll_d16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
 
