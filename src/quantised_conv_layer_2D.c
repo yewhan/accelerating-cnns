@@ -117,94 +117,95 @@ int optimised_layerv1_arraycopying_vectorised_Char(const unsigned char* in_Char,
   }
 
   // array copying - filter_Char into form usable for vectorising m loop
-  #pragma omp for collapse(4) schedule(static)
-  for (unsigned int m = 0; m < Output_depth_dim; m += 8) {
+  // vectorise in here? filter_Char_copy[new_subscript] = _mm256_set1_epi32(*(unsigned int *) &filter_Char[old_subscript]);
+  unsigned long long int new_subscript = 0;
+  for (unsigned int m = 0; m < Output_depth_dim; m++) {
     for (unsigned int y = 0; y < Mask_Y_dim; y++) {
       for (unsigned int x = 0; x < Mask_X_dim; x++) {
-        for (unsigned int d = 0; d < Input_depth_dim; d++) {
-          for (unsigned int mm = m; mm < m + 8; mm++) {
-            unsigned long long int old_subscript = mm * Mask_Y_dim * Mask_X_dim * Input_depth_dim
-              + y * Mask_X_dim * Input_depth_dim
-              + x * Input_depth_dim
-              + d;
-              
-            unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-              + x * Input_depth_dim * Output_depth_dim
-              + d * Output_depth_dim
-              + mm;
-
-            filter_Char_copy[new_subscript] = filter_Char[old_subscript];
-          }
+        for (unsigned int d = 0; d < Input_depth_dim; d+=4) {
+          unsigned long long int old_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+            + y * Mask_X_dim * Input_depth_dim
+            + x * Input_depth_dim
+            + d;
+          
+          filter_Char_copy[new_subscript++] = filter_Char[old_subscript];
+          filter_Char_copy[new_subscript++] = filter_Char[old_subscript+1];
+          filter_Char_copy[new_subscript++] = filter_Char[old_subscript+2];
+          filter_Char_copy[new_subscript++] = filter_Char[old_subscript+3];
+          // new_subscript++;
         }
       }
     }
   }
 
+  // for (unsigned int y = 0; y < Mask_Y_dim; y++) {
+  //   for (unsigned int x = 0; x < Mask_X_dim; x++) {
+  //     for (unsigned int d = 0; d < Input_depth_dim; d++) {
+  //       for (unsigned int m = 0; m < Output_depth_dim; m++) {
+  //         unsigned long long int old_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+  //           + y * Mask_X_dim * Input_depth_dim
+  //           + x * Input_depth_dim
+  //           + d;
+              
+  //         unsigned long long int new_subscript = y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+  //           + x * Input_depth_dim * Output_depth_dim
+  //           + d * Output_depth_dim
+  //           + m;
+
+  //         filter_Char_copy[new_subscript] = filter_Char[old_subscript];
+  //       }
+  //     }
+  //   }
+  // }
+
+
   for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
-    for (unsigned int m = 0; m < Output_depth_dim; m+=32) { //channels
+    for (unsigned int m = 0; m < Output_depth_dim; m+=8) { //channels
       __m256i bias = _mm256_load_si256((__m256i*)&bias_array_Int[m]);
-      __m256i bias2 = _mm256_load_si256((__m256i*)&bias_array_Int[m+8]);
-      __m256i bias3 = _mm256_load_si256((__m256i*)&bias_array_Int[m+16]);
-      __m256i bias4 = _mm256_load_si256((__m256i*)&bias_array_Int[m+24]);
       // bias = bias_array_Int[m];
 
       for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
         for (unsigned int x = 0; x < Output_X_dim; x++) {	//Output Width
           __m256i temp = _mm256_setzero_si256(); 
-          __m256i temp2 = _mm256_setzero_si256();
-          __m256i temp3 = _mm256_setzero_si256();
-          __m256i temp4 = _mm256_setzero_si256();
           // temp = 0;
 
           for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
             for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
-              for (unsigned int d = 0; d < Input_depth_dim; d++) {
+              for (unsigned int d = 0; d < Input_depth_dim; d+=4) {
 
                 unsigned long long int in_subscript = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
                   + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
                   + (x * Stride_X_dim + off_x) * Input_depth_dim
                   + d;
 
-                unsigned long long int filter_subscript = off_y * Mask_X_dim * Input_depth_dim * Output_depth_dim
-                  + off_x * Input_depth_dim * Output_depth_dim
-                  + d * Output_depth_dim
-                  + m;
+                unsigned long long int filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
 
+                // unsigned long long int filter_subscript = off_y * Mask_X_dim * Input_depth_dim * Output_depth_dim
+                //   + off_x * Input_depth_dim * Output_depth_dim
+                //   + d * Output_depth_dim
+                //   + m;
 
-                // __m256i s_l = _mm256_cvtepu8_epi16(_mm256_set1_epi8((const __m128i*)&in_Char[in_subscript]));
-                __m256i s = _mm256_cvtepu8_epi16(_mm_set1_epi8(in_Char[in_subscript]));
-                // __m256i s = _mm256_load_si256((const __m256i*)&in_Char[in_subscript]);
-                __m256i w_l = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript]));
-                __m256i w_h = _mm256_cvtepi8_epi16(_mm_load_si128((const __m128i*)&filter_Char[filter_subscript+16]));
+                // unsigned char d0 = in_Char[in_subscript];
+                // unsigned char d1 = in_Char[in_subscript + 1];
+                // unsigned char d2 = in_Char[in_subscript + 2];
+                // unsigned char d3 = in_Char[in_subscript + 3];
 
-                // __m256i inter_vec = _mm256_cvtepi8_epi16(_mm256_castsi256_si128(w_l));
-                temp = _mm256_add_epi16(temp, _mm256_mullo_epi16(s, w_l));
-                temp3 = _mm256_add_epi16(temp3, _mm256_mullo_epi16(s, w_h));
+                // __m256i s = _mm256_setr_epi8(d0,d1,d2,d3,d0,d1,d2,d3,d0,d1,d2,d3,d0,d1,
+                //   d2,d3,d0,d1,d2,d3,d0,d1,d2,d3,d0,d1,d2,d3,d0,d1,d2,d3);
 
-                // __m256i inter_vec = _mm256_madd_epi16(s_l, w_l);
-                // inter_vec = _mm256_add_epi32(inter_vec, _mm256_madd_epi16(s_h, w_h));
-                // temp_vec = _mm256_add_epi32(temp_vec, inter_vec);
+                __m256i s = _mm256_set1_epi32(*(unsigned int *)&in_Char[in_subscript]); // loading in 4, 8bit chars (32 bit worth of data) and broadcast across s
 
-                
+                __m256i w = _mm256_loadu_si256((const __m256i*)&filter_Char_copy[filter_subscript]);
 
-                // __m256i s = _mm256_set1_epi8(in_Char[in_subscript]);
-                // __m256i w = _mm256_load_si256((const __m256i*)&filter_Char_copy[filter_subscript]);
-
-                // temp = ;
-
-
-                // unsigned char s = in_Char[in_subscript];
-                // signed char w = filter_Char[filter_subscript];
-                // temp = temp + s * w;
+                __m256i inter_vec = _mm256_maddubs_epi16(s, w);
+                inter_vec = _mm256_madd_epi16(inter_vec, _mm256_set1_epi16(1));
+                temp = _mm256_add_epi32(temp, inter_vec);
               }
             }
           }
-
-          temp2 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(temp));
-          temp = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(temp, 1));
-
-          temp4 = _mm256_cvtepi16_epi32(_mm256_castsi256_si128(temp3));
-          temp3 = _mm256_cvtepi16_epi32(_mm256_extracti128_si256(temp3, 1));
 
 
           unsigned long long int out_subscript = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
@@ -213,32 +214,20 @@ int optimised_layerv1_arraycopying_vectorised_Char(const unsigned char* in_Char,
             + m;
 
           temp = _mm256_add_epi32(temp, bias);
-          temp2 = _mm256_add_epi32(temp2, bias2);
-          temp3 = _mm256_add_epi32(temp3, bias3);
-          temp4 = _mm256_add_epi32(temp4, bias4);
+          temp = _mm256_max_epi32(temp, _mm256_set1_epi32(0));
 
-          temp = _mm256_max_epi32(temp, _mm256_setzero_si256());
-          temp2 = _mm256_max_epi32(temp2, _mm256_setzero_si256());
-          temp3 = _mm256_max_epi32(temp3, _mm256_setzero_si256());
-          temp4 = _mm256_max_epi32(temp4, _mm256_setzero_si256());
-
-          for (unsigned int i = 0; i < 8; i++) {
+          for (int i = 0; i < 8; i++) {
             out_to_compare_with_Char[out_subscript+i] = temp[i];
-            out_to_compare_with_Char[out_subscript+i+8] = temp2[i];
-            out_to_compare_with_Char[out_subscript+i+16] = temp3[i];
-            out_to_compare_with_Char[out_subscript+i+24] = temp4[i];
           }
-
-          // out_to_compare_with_Char[out_subscript] = Relu_int(temp);
+          // _mm256_store_si256((__m256i*)&out_to_compare_with_Char[out_subscript], temp);
 
         }
       }
     }
   }
-
-  printf("\n from quantised unopt %d %d ", out_to_compare_with_Char[0], out_to_compare_with_Char[1]);
-  return 0;
   
+  printf("\n from quantised array_copying vectorised %d %d ", out_to_compare_with_Char[0], out_to_compare_with_Char[1]);
+  return 0;
 }
 
 
@@ -719,7 +708,7 @@ int optimised_layerv4_general_register_pressure_d_Char(const unsigned char* in_C
 
 // reduce general register pressure in d loop
 // 123 GFLOPS, 1.03x speedup
-int optimised_layerv5_loop_tiling_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char) {
+int optimised_layerv5_loop_tiling_d_Char(const unsigned char* in_Char, const signed char* filter_Char, const int* bias_array_Int, unsigned char* out_to_compare_with_Char) {
 
   #define tile 32
 

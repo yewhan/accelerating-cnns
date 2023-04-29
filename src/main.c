@@ -105,6 +105,7 @@ int main() {
   load_create_input_output_array_FP();
   load_filter_array_FP();
 
+
   #ifndef QUANTISATION
     // Dr. Kelefouras' unoptimized layer taken as a base:
     unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
@@ -148,7 +149,8 @@ int main() {
     // optimised_layer_v2_unroll_x4m2_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x2m4_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x4m2_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v2_unroll_x3m3_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
 
