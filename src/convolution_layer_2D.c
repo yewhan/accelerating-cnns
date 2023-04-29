@@ -4241,13 +4241,13 @@ int optimised_layer_v3_x3m3_unroll_d16_FP(const float* in_FP, const float* filte
     }
   }
 
-  printf("\n from optv3  %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  printf("\n from optv3 x3 m3 d16 v1  %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
   return 0;
 }
 
 
 // same as above, for x3m3 non-opt
-// ~62 GFLOPS, better perf than above, making instruction cache miss perf more likely? profile with cachegrind/ likwid to find out more
+// ~63 GFLOPS, better perf than above, making instruction cache miss perf more likely? profile with cachegrind/ likwid to find out more
 int optimised_layer_v3_x3m3_unroll_d16_v2_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
   float bias, bias2, bias3;
   __m256 temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8, temp9;
@@ -4726,9 +4726,277 @@ int optimised_layer_v3_x3m3_unroll_d16_v2_FP(const float* in_FP, const float* fi
     }
   }
 
-  printf("\n from optv2 x3 m3 hadd %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  printf("\n from optv3 x3 m3 hadd d16 v2 %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
   return 0;
 }
+
+
+// unroll d by factor of 2 (d16)
+// ~60 GFLOPS, 
+int optimised_layer_v3_x2m4_unroll_d16_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  float bias, bias2, bias3, bias4;
+  __m256 temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8;
+
+  for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+    for (unsigned int m = 0; m < Output_depth_dim; m+=4) { //channels
+      bias = bias_array_FP[m];
+      bias2 = bias_array_FP[m+1];
+      bias3 = bias_array_FP[m+2];
+      bias4 = bias_array_FP[m+3];
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        for (unsigned int x = 0; x < Output_X_dim; x+=2) {	//Output Width
+          temp = _mm256_setzero_ps();
+          temp2 = _mm256_setzero_ps();
+          temp3 = _mm256_setzero_ps();
+          temp4 = _mm256_setzero_ps();
+          temp5 = _mm256_setzero_ps();
+          temp6 = _mm256_setzero_ps();
+          temp7 = _mm256_setzero_ps();
+          temp8 = _mm256_setzero_ps();
+          // temp = 0.0f;
+
+          for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+            for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+              for (unsigned int d = 0; d < Input_depth_dim; d+=16) {
+
+                unsigned long long int in_subscript = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                  + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                  + (x * Stride_X_dim + off_x) * Input_depth_dim
+                  + d;
+                unsigned long long int in_subscript2 = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                  + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                  + ((x+1) * Stride_X_dim + off_x) * Input_depth_dim
+                  + d;
+
+
+                unsigned long long int filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
+                unsigned long long int filter_subscript2 = (m+1) * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
+                unsigned long long int filter_subscript3 = (m+2) * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
+                unsigned long long int filter_subscript4 = (m+3) * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + d;
+
+                __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                __m256 s2 = _mm256_load_ps(&in_FP[in_subscript2]);
+
+                __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript2]);
+                __m256 w3 = _mm256_load_ps(&filter_FP[filter_subscript3]);
+                __m256 w4 = _mm256_load_ps(&filter_FP[filter_subscript4]);
+
+                temp = _mm256_add_ps(temp, _mm256_mul_ps(s, w));
+                temp2 = _mm256_add_ps(temp2, _mm256_mul_ps(s2, w));
+                temp3 = _mm256_add_ps(temp3, _mm256_mul_ps(s, w2));
+                temp4 = _mm256_add_ps(temp4, _mm256_mul_ps(s2, w2));
+                temp5 = _mm256_add_ps(temp5, _mm256_mul_ps(s, w3));
+                temp6 = _mm256_add_ps(temp6, _mm256_mul_ps(s2, w3));
+                temp7 = _mm256_add_ps(temp7, _mm256_mul_ps(s, w4));
+                temp8 = _mm256_add_ps(temp8, _mm256_mul_ps(s2, w4));
+
+
+                // d+8 ------------------------------------------------------------
+                // |
+                // |
+                // v
+
+                in_subscript = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                  + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                  + (x * Stride_X_dim + off_x) * Input_depth_dim
+                  + (d+8);
+                in_subscript2 = b * (Input_Y_dim * Input_X_dim * Input_depth_dim)
+                  + (y * Stride_Y_dim + off_y) * Input_X_dim * Input_depth_dim
+                  + ((x+1) * Stride_X_dim + off_x) * Input_depth_dim
+                  + (d+8);
+
+
+                filter_subscript = m * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + (d+8);
+                filter_subscript2 = (m+1) * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + (d+8);
+                filter_subscript3 = (m+2) * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + (d+8);
+                filter_subscript4 = (m+3) * Mask_Y_dim * Mask_X_dim * Input_depth_dim
+                  + off_y * Mask_X_dim * Input_depth_dim
+                  + off_x * Input_depth_dim
+                  + (d+8);
+
+                s = _mm256_load_ps(&in_FP[in_subscript]);
+                s2 = _mm256_load_ps(&in_FP[in_subscript2]);
+
+                w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                w2 = _mm256_load_ps(&filter_FP[filter_subscript2]);
+                w3 = _mm256_load_ps(&filter_FP[filter_subscript3]);
+                w4 = _mm256_load_ps(&filter_FP[filter_subscript4]);
+
+                temp = _mm256_add_ps(temp, _mm256_mul_ps(s, w));
+                temp2 = _mm256_add_ps(temp2, _mm256_mul_ps(s2, w));
+                temp3 = _mm256_add_ps(temp3, _mm256_mul_ps(s, w2));
+                temp4 = _mm256_add_ps(temp4, _mm256_mul_ps(s2, w2));
+                temp5 = _mm256_add_ps(temp5, _mm256_mul_ps(s, w3));
+                temp6 = _mm256_add_ps(temp6, _mm256_mul_ps(s2, w3));
+                temp7 = _mm256_add_ps(temp7, _mm256_mul_ps(s, w4));
+                temp8 = _mm256_add_ps(temp8, _mm256_mul_ps(s2, w4));
+              }
+            }
+          }
+
+
+          unsigned long long int out_subscript = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            x * Output_depth_dim
+            + m;
+          unsigned long long int out_subscript2 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            (x+1) * Output_depth_dim
+            + m;
+          unsigned long long int out_subscript3 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            x * Output_depth_dim
+            + (m+1);
+          unsigned long long int out_subscript4 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            (x+1) * Output_depth_dim
+            + (m+1);
+          unsigned long long int out_subscript5 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            x * Output_depth_dim
+            + (m+2);
+          unsigned long long int out_subscript6 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            (x+1) * Output_depth_dim
+            + (m+2);
+          unsigned long long int out_subscript7 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            x * Output_depth_dim
+            + (m+3);
+          unsigned long long int out_subscript8 = b * (Output_depth_dim * Output_X_dim * Output_Y_dim) +
+            y * (Output_depth_dim * Output_X_dim) +
+            (x+1) * Output_depth_dim
+            + (m+3);
+
+
+
+          temp = _mm256_hadd_ps(temp, temp);
+          temp = _mm256_hadd_ps(temp, temp);
+          __m128 tempLo = _mm256_castps256_ps128(temp);
+          __m128 tempHi = _mm256_extractf128_ps(temp, 1);
+          __m128 sseSum = _mm_add_ps(tempLo, tempHi);
+
+          float sum = _mm_cvtss_f32(sseSum);
+
+          sum += bias;
+          out_to_compare_with_FP[out_subscript] = Relu_float(sum);
+
+
+          temp2 = _mm256_hadd_ps(temp2, temp2);
+          temp2 = _mm256_hadd_ps(temp2, temp2);
+          __m128 tempLo2 = _mm256_castps256_ps128(temp2);
+          __m128 tempHi2 = _mm256_extractf128_ps(temp2, 1);
+          __m128 sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+          float sum2 = _mm_cvtss_f32(sseSum2);
+
+          sum2 += bias;
+          out_to_compare_with_FP[out_subscript2] = Relu_float(sum2);
+
+
+          temp3 = _mm256_hadd_ps(temp3, temp3);
+          temp3 = _mm256_hadd_ps(temp3, temp3);
+           tempLo = _mm256_castps256_ps128(temp3);
+           tempHi = _mm256_extractf128_ps(temp3, 1);
+           sseSum = _mm_add_ps(tempLo, tempHi);
+
+          float sum3 = _mm_cvtss_f32(sseSum);
+
+          sum3 += bias2;
+          out_to_compare_with_FP[out_subscript3] = Relu_float(sum3);
+
+
+          temp4 = _mm256_hadd_ps(temp4, temp4);
+          temp4 = _mm256_hadd_ps(temp4, temp4);
+           tempLo2 = _mm256_castps256_ps128(temp4);
+           tempHi2 = _mm256_extractf128_ps(temp4, 1);
+           sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+          float sum4 = _mm_cvtss_f32(sseSum2);
+
+          sum4 += bias2;
+          out_to_compare_with_FP[out_subscript4] = Relu_float(sum4);
+
+
+          temp5 = _mm256_hadd_ps(temp5, temp5);
+          temp5 = _mm256_hadd_ps(temp5, temp5);
+           tempLo = _mm256_castps256_ps128(temp5);
+           tempHi = _mm256_extractf128_ps(temp5, 1);
+           sseSum = _mm_add_ps(tempLo, tempHi);
+
+          float sum5 = _mm_cvtss_f32(sseSum);
+
+          sum5 += bias3;
+          out_to_compare_with_FP[out_subscript5] = Relu_float(sum5);
+
+
+          temp6 = _mm256_hadd_ps(temp6, temp6);
+          temp6 = _mm256_hadd_ps(temp6, temp6);
+           tempLo2 = _mm256_castps256_ps128(temp6);
+           tempHi2 = _mm256_extractf128_ps(temp6, 1);
+           sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+          float sum6 = _mm_cvtss_f32(sseSum2);
+
+          sum6 += bias3;
+          out_to_compare_with_FP[out_subscript6] = Relu_float(sum6);
+
+
+          temp7 = _mm256_hadd_ps(temp7, temp7);
+          temp7 = _mm256_hadd_ps(temp7, temp7);
+           tempLo = _mm256_castps256_ps128(temp7);
+           tempHi = _mm256_extractf128_ps(temp7, 1);
+           sseSum = _mm_add_ps(tempLo, tempHi);
+
+          float sum7 = _mm_cvtss_f32(sseSum);
+
+          sum7 += bias4;
+          out_to_compare_with_FP[out_subscript7] = Relu_float(sum7);
+
+
+          temp8 = _mm256_hadd_ps(temp8, temp8);
+          temp8 = _mm256_hadd_ps(temp8, temp8);
+           tempLo2 = _mm256_castps256_ps128(temp8);
+           tempHi2 = _mm256_extractf128_ps(temp8, 1);
+           sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+          float sum8 = _mm_cvtss_f32(sseSum2);
+
+          sum8 += bias4;
+          out_to_compare_with_FP[out_subscript8] = Relu_float(sum8);
+        }
+      }
+    }
+  }
+
+  printf("\n from optv3 x2 m4 d16 %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  return 0;
+}
+
+
 
 
 
