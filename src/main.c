@@ -169,7 +169,8 @@ int main() {
 
     // optimised_layer_v4_x3m3_tiled_y_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v4_x3m3_tiled_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v4_x3m3_tiled_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v4_x3m3_tiled_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v4_x2m4_tiled_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
 
