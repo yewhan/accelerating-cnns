@@ -68,6 +68,9 @@ int optimised_layer_v3_x4m2_unroll_d32_FP(const float* in_FP, const float* filte
 int optimised_layer_v3_x2m2_unroll_d32_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layer_v3_x2m2_unroll_d32_opt_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
+int optimised_layer_v4_x3m3_tiled_y_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v4_x3m3_tiled_x_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+
 
 
 
