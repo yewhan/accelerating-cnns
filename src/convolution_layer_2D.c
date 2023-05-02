@@ -10188,6 +10188,7 @@ int optimised_layer_v4_x2m4_tiled_m_FP(const float* in_FP, const float* filter_F
 
 // loop tiling on m loop (swapped m and y loops), optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(), also applied loop interchange (perf increase from that?)
 // tile = 4 ~70 GFLOPS, tile =8 ~72 GFLOPS, tile = 16 ~73 GFLOPS, 
+// *********** according to perf causes less cache misses ***********
 int optimised_layer_v4_x2m4_tiled_m_moved_m_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
   float bias, bias2, bias3, bias4;
   __m256 temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8;
@@ -10863,7 +10864,9 @@ int optimised_layer_v4_x2m4_tiled_x_m_moved_m_FP(const float* in_FP, const float
 
 
 // loop tiling not super worth since more computational bound as opposed to memory? test with likwid
-// test applying again after parallelisation
+// test applying again after parallelisation, as each core has dedicated L1/ L2 cache on zen 3
+
+
 
 
 
