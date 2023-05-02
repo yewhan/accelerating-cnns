@@ -80,6 +80,12 @@ int optimised_layer_v4_x2m4_tiled_x_m_loop_interchange_m_FP(const float* in_FP, 
 int optimised_layer_v5_x2m4_loop_interchange_m_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layer_v5_x3m3_loop_interchange_m_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
+int optimised_layer_v6_x2m4_left_shift_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v6_x2m4_left_shift_register_pressure_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v6_x3m3_left_shift_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v6_x3m3_left_shift_register_pressure_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v6_x3m3_left_shift_register_pressure_opt_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+
 
 
 

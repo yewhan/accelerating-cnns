@@ -158,7 +158,7 @@ int main() {
     // optimised_layer_v2_unroll_x4m2_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v2_unroll_x3m3_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v2_unroll_x3m3_hadd_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_unroll_x3m3_hadd_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
     // optimised_layer_v3_x3m3_unroll_d16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v3_x3m3_unroll_d16_v2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -184,6 +184,13 @@ int main() {
 
     // optimised_layer_v5_x2m4_loop_interchange_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v5_x3m3_loop_interchange_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
+    // optimised_layer_v6_x2m4_left_shift_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v6_x2m4_left_shift_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v6_x3m3_left_shift_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v6_x3m3_left_shift_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v6_x3m3_left_shift_register_pressure_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    
 
 
 
@@ -319,7 +326,7 @@ unsigned short int equal_Char(unsigned char const a, unsigned char const b) {
 void read_layer_dimensions() {
 
   // x & y are assumed square, multiples of 4
-  // in & output depth are assumed multiples of 32
+  // in & output depth are assumed powers of 2 greater than 32
 
     // Input_Output_batch_dim=2000;
     Input_Output_batch_dim=20;
@@ -333,7 +340,7 @@ void read_layer_dimensions() {
     Mask_Y_dim=3;
     Mask_X_dim=3;
 
-    Output_depth_dim=1024;
+    Output_depth_dim=128;
     Output_X_dim=(Input_X_dim-(Mask_X_dim-Stride_X_dim)) / Stride_X_dim;
     Output_Y_dim=(Input_Y_dim-(Mask_Y_dim-Stride_Y_dim)) / Stride_Y_dim;
 
