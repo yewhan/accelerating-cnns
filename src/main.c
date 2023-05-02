@@ -108,7 +108,13 @@ int main() {
 
   #ifndef QUANTISATION
     // Dr. Kelefouras' unoptimized layer taken as a base:
-    unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
+    // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
+    // optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layer_v3_x2m4_unroll_d32_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    optimised_layer_v4_x2m4_tiled_m_moved_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+
+
+
     // optimised_layer_v6_AC_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layer_v8_AC_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
     // optimised_layer_v14_AC_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
@@ -126,7 +132,7 @@ int main() {
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < 1; i++)
   {
 
   #ifndef QUANTISATION
@@ -173,7 +179,8 @@ int main() {
     // optimised_layer_v4_x2m4_tiled_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v4_x2m4_tiled_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v4_x2m4_tiled_m_moved_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v4_x2m4_tiled_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v4_x2m4_tiled_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v4_x2m4_tiled_x_m_moved_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
 
@@ -212,7 +219,7 @@ int main() {
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/1);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
@@ -308,6 +315,8 @@ unsigned short int equal_Char(unsigned char const a, unsigned char const b) {
 
 void read_layer_dimensions() {
 
+  // x & y are assumed square, multiples of 4
+  // in & output depth are assumed multiples of 32
 
     // Input_Output_batch_dim=2000;
     Input_Output_batch_dim=20;
@@ -321,7 +330,7 @@ void read_layer_dimensions() {
     Mask_Y_dim=3;
     Mask_X_dim=3;
 
-    Output_depth_dim=128;
+    Output_depth_dim=1024;
     Output_X_dim=(Input_X_dim-(Mask_X_dim-Stride_X_dim)) / Stride_X_dim;
     Output_Y_dim=(Input_Y_dim-(Mask_Y_dim-Stride_Y_dim)) / Stride_Y_dim;
 
