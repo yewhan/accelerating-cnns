@@ -132,7 +132,7 @@ int main() {
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 1; i++)
+  for (int i = 0; i < 10; i++)
   {
 
   #ifndef QUANTISATION
@@ -178,9 +178,11 @@ int main() {
     // optimised_layer_v4_x3m3_tiled_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v4_x2m4_tiled_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v4_x2m4_tiled_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v4_x2m4_tiled_m_moved_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v4_x2m4_tiled_m_moved_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v4_x2m4_tiled_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v4_x2m4_tiled_x_m_moved_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
+    optimised_layer_v5_unroll_x2m4_moved_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
 
@@ -219,7 +221,7 @@ int main() {
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/1);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
