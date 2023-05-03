@@ -91,6 +91,10 @@ int optimised_layer_v6_x3m3_left_shift_register_pressure_opt_FP(const float* in_
 int optimised_layer_v7_x2m4_ops_outside_loop_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layer_v7_x3m3_ops_outside_loop_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
+int optimised_layer_v8_x2m4_inline_relu_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v8_x3m3_inline_relu_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+
+
 
 
 // vectorised m, AKA array copying functions
