@@ -188,10 +188,13 @@ int main() {
     // optimised_layer_v6_x2m4_left_shift_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v6_x2m4_left_shift_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v6_x2m4_left_shift_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v6_x2m4_left_shift_register_pressure_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v6_x2m4_left_shift_register_pressure_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v6_x3m3_left_shift_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v6_x3m3_left_shift_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v6_x3m3_left_shift_register_pressure_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
+    // optimised_layer_v7_x2m4_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v7_x3m3_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     
 
 
