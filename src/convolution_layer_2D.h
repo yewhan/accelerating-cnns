@@ -99,6 +99,12 @@ int optimised_layer_v9_x2m4_omp_collapsed_FP(const float* in_FP, const float* fi
 int optimised_layer_v9_x3m3_omp_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layer_v9_x3m3_omp_collapsed_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
+int optimised_layer_v10_x2m4_const_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v10_x3m3_const_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+
+int optimised_layer_v11_x2m4_var_declaration_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v11_x3m3_var_declaration_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+
 
 
 
