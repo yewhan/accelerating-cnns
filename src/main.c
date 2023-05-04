@@ -200,7 +200,9 @@ int main() {
     // optimised_layer_v8_x3m3_inline_relu_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
     // optimised_layer_v9_x2m4_omp_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v9_x3m3_omp_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v9_x2m4_omp_collapsed_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v9_x3m3_omp_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    optimised_layer_v9_x3m3_omp_collapsed_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     
 
 
