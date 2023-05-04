@@ -16134,7 +16134,7 @@ int optimised_layer_v9_x3m3_omp_collapsed_FP(const float* in_FP, const float* fi
 
   unsigned int m, x;
   #pragma omp parallel for private(bias, bias2, bias3, temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8, temp9, m, x) \
-    shared(in_yx_depth, in_x_depth, mask_yx_depth, mask_x_depth, out_yx_depth, out_x_depth, m_bound, x_bound) default(shared) collapse(3) schedule(static)
+    shared(in_yx_depth, in_x_depth, mask_yx_depth, mask_x_depth, out_yx_depth, out_x_depth, m_bound, x_bound) default(shared) collapse(2) schedule(static)
   {
     for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
       for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
