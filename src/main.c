@@ -88,7 +88,7 @@ int* bias_array_Int;                      // pointer to bias array - int
 
 
 
-#define EPSILON 0.001
+#define EPSILON 0.01
 
 
 
@@ -132,7 +132,7 @@ int main() {
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 1000; i++)
+  for (int i = 0; i < 10; i++)
   {
 
   #ifndef QUANTISATION
@@ -213,6 +213,9 @@ int main() {
     // optimised_layer_v12_x2m4_fmadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     optimised_layer_v12_x3m3_fmadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
+    // optimised_layer_v13_x2m4_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v13_x3m3_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
     
 
 
@@ -252,7 +255,7 @@ int main() {
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/1000);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
@@ -363,7 +366,7 @@ void read_layer_dimensions() {
     Mask_Y_dim=3;
     Mask_X_dim=3;
 
-    Output_depth_dim=128;
+    Output_depth_dim=16384;
     Output_X_dim=(Input_X_dim-(Mask_X_dim-Stride_X_dim)) / Stride_X_dim;
     Output_Y_dim=(Input_Y_dim-(Mask_Y_dim-Stride_Y_dim)) / Stride_Y_dim;
 

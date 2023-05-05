@@ -108,6 +108,9 @@ int optimised_layer_v11_x3m3_var_declaration_FP(const float* in_FP, const float*
 int optimised_layer_v12_x2m4_fmadd_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 int optimised_layer_v12_x3m3_fmadd_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
 
+int optimised_layer_v13_x2m4_loop_tiling_m_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+int optimised_layer_v13_x3m3_loop_tiling_m_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP);
+
 
 
 
