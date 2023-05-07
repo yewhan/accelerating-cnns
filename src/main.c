@@ -2,7 +2,7 @@
 ------------------DR VASILIOS KELEFOURAS-----------------------------------------------------
 ------------------UNIVERSITY OF PLYMOUTH, SCHOOL OF ENGINEERING, COMPUTING AND MATHEMATICS---
 
-Altered by Euan Hughes
+------------------Altered by Euan Hughes-----------------------------------------------------
 
 */
 
@@ -88,7 +88,7 @@ int* bias_array_Int;                      // pointer to bias array - int
 
 
 
-#define EPSILON 0.01
+#define EPSILON 0.001
 
 
 
@@ -211,7 +211,7 @@ int main() {
     // optimised_layer_v11_x3m3_var_declaration_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
     // optimised_layer_v12_x2m4_fmadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    optimised_layer_v12_x3m3_fmadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v12_x3m3_fmadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
     // optimised_layer_v13_x2m4_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v13_x3m3_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -222,9 +222,26 @@ int main() {
 
     // ***** vectorised m loop, AKA array copying functions *****
     // optimised_layer_v1_AC_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
     // optimised_layer_v2_AC_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_AC_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v4_AC_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_x8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_m32_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_m64_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_x4m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_x2m32_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_unroll_x3m24_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
+    // optimised_layer_v3_AC_x2m32_unroll_d2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v3_AC_x2m32_unroll_d4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v3_AC_x2m32_unroll_d8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_x3m24_unroll_d2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_x3m24_unroll_d4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v2_AC_x3m24_unroll_d8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
+
+    // optimised_layer_v2_AC_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v5_AC_register_pressure_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v6_AC_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
     // optimised_layer_v7_AC_strength_reduction_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
@@ -366,7 +383,7 @@ void read_layer_dimensions() {
     Mask_Y_dim=3;
     Mask_X_dim=3;
 
-    Output_depth_dim=16384;
+    Output_depth_dim=128;
     Output_X_dim=(Input_X_dim-(Mask_X_dim-Stride_X_dim)) / Stride_X_dim;
     Output_Y_dim=(Input_Y_dim-(Mask_Y_dim-Stride_Y_dim)) / Stride_Y_dim;
 
