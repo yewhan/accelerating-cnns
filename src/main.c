@@ -2,22 +2,29 @@
 ------------------DR VASILIOS KELEFOURAS-----------------------------------------------------
 ------------------UNIVERSITY OF PLYMOUTH, SCHOOL OF ENGINEERING, COMPUTING AND MATHEMATICS---
 
-------------------Altered by Euan Hughes-----------------------------------------------------
+------------------Adapted by Euan Hughes-----------------------------------------------------
 
 */
 
 /*
 This is a software application that executes the convolution and ReLU layer in a Deep Neural Network.
-The layer input parameters are specified in  void read_layer_dimensions().
+The layer input parameters are specified in void read_layer_dimensions().
+
+It is capable of performing the convolution/ReLU operation using quantised data. To achieve this, ensure the "QUANTISATION" macro is defined.
 */
 
 #include <mm_malloc.h>
 
 #include "convolution_layer_2D.h"
+#include "quantised_conv_layer_2D.h"
+// #include "testing_code/array_copied.h"
+// #include "testing_code/non_array_copied.h"
 #include <limits.h>
 #include <stdint.h>
 
 
+
+#define N 10
 
 // #define QUANTISATION        // **************** COMMENT OUT TO DISABLE QUANTISATION ****************
 
@@ -109,161 +116,60 @@ int main() {
   #ifndef QUANTISATION
     // Dr. Kelefouras' unoptimized layer taken as a base:
     // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP); //to compare
-    optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layer_v3_x2m4_unroll_d32_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layer_v4_x2m4_tiled_m_loop_interchange_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
+    // ***** vectorised d loop *****
+    // optimised_layer_v15_x4m2_edge_cases_AC(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layer_v15_x3m3_edge_cases_AC(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
-
-    // optimised_layer_v6_AC_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layer_v8_AC_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layer_v14_AC_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
-    // optimised_layer_v15_AC_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // ***** vectorised m loop *****
+    optimised_layer_v16_AC_x4m16d8_edge_cases_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
+    // optimised_layer_v16_AC_x4m16d8_edge_cases_interchange_x_m_FP(in_FP, filter_FP, bias_array_FP, out_to_compare_with_FP);
 
 
   #else
-    // quantised functions
+    // ***** quantised functions *****
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
-    optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
 
+    // opt_m2x4_deep_AVX_d64_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+    // opt_m2x4_deep_AVX_d32_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
+    opt_m2x4_deep_SSE_d16_Char(in_Char, filter_Char, bias_array_Int, out_to_compare_with_Char);
   #endif
 
 
 
   start_time = omp_get_wtime();
 
-  for (int i = 0; i < 10; i++)
+  for (int i = 0; i < N; i++)
   {
 
   #ifndef QUANTISATION
-    // unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    //  unoptimized_layer_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
+    // profile_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+
 
     // ***** vectorised d loop *****
-    // optimised_layer_v1_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v1_vectorised_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v2_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x4_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x8_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_m4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_m4_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_m8_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x2m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x2m2_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x4m2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x4m2_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x2m4_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x4m2_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x2m4_hadd_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x3m3_hadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_unroll_x3m3_hadd_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v3_x3m3_unroll_d16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x3m3_unroll_d16_v2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x2m4_unroll_d16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x4m2_unroll_d16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x2m2_unroll_d16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x2m2_unroll_d16_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x3m3_unroll_d32_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x3m3_unroll_d32_v2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x2m4_unroll_d32_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x4m2_unroll_d32_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x2m2_unroll_d32_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_x2m2_unroll_d32_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v4_x3m3_tiled_y_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v4_x3m3_tiled_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v4_x3m3_tiled_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v4_x2m4_tiled_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v4_x2m4_tiled_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v4_x2m4_tiled_m_loop_interchange_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v4_x2m4_tiled_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v4_x2m4_tiled_x_m_loop_interchange_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v5_x2m4_loop_interchange_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v5_x3m3_loop_interchange_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v6_x2m4_left_shift_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v6_x2m4_left_shift_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v6_x2m4_left_shift_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v6_x2m4_left_shift_register_pressure_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v6_x3m3_left_shift_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v6_x3m3_left_shift_register_pressure_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v6_x3m3_left_shift_register_pressure_opt_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v7_x2m4_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v7_x3m3_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v8_x2m4_inline_relu_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v8_x3m3_inline_relu_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v9_x2m4_omp_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v9_x2m4_omp_collapsed_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v9_x3m3_omp_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v9_x3m3_omp_collapsed_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v10_x2m4_const_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v10_x3m3_const_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v11_x2m4_var_declaration_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v11_x3m3_var_declaration_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v12_x2m4_fmadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v12_x3m3_fmadd_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v13_x2m4_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v13_x3m3_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    
+    // optimised_layer_v15_x4m2_edge_cases_AC(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v15_x3m3_edge_cases_AC(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
-
-    // ***** vectorised m loop, AKA array copying functions *****
-    // optimised_layer_v1_AC_vectorised_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v2_AC_unroll_x2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_unroll_x4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_unroll_x8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_unroll_m32_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_unroll_m64_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_unroll_x4m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_unroll_x2m32_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_unroll_x3m24_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-
-    // optimised_layer_v3_AC_x2m32_unroll_d2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_AC_x2m32_unroll_d4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v3_AC_x2m32_unroll_d8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_x3m24_unroll_d2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_x3m24_unroll_d4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v2_AC_x3m24_unroll_d8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // ***** vectorised m loop *****
+    optimised_layer_v16_AC_x4m16d8_edge_cases_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v16_AC_x4m16d8_tiled_edge_cases_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v16_AC_x4m16d8_edge_cases_interchange_x_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
+    // optimised_layer_v16_AC_x4m16d8_tiled_edge_cases_interchange_x_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
 
 
-    // optimised_layer_v2_AC_unroll_m16_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v5_AC_register_pressure_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v6_AC_register_pressure_x_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v7_AC_strength_reduction_d_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v8_AC_loop_tiling_m_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v9_AC_unroll_d2_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v10_AC_unroll_d4_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v11_AC_unroll_d8_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v12_AC_ops_outside_loop_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v13_AC_sign_unsigned_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v14_AC_omp_2blocks_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-    // optimised_layer_v15_AC_omp_1block_FP(in_FP, filter_FP, bias_array_FP, out_FP);
-  
   
   #else
 
     // ***** quantised functions *****
     // unoptimized_layer_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    // optimised_layerv1_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    optimised_layerv1_arraycopying_vectorised_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    // optimised_layerv2_unroll_x2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    // optimised_layerv3_unroll_m2_Char(in_Char, filter_Char, bias_array_Int, out_Char);
-    // optimised_layerv4_general_register_pressure_d_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+
+    opt_m2x4_deep_AVX_d64_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    // opt_m2x4_deep_AVX_d32_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+    // opt_m2x4_deep_SSE_d16_Char(in_Char, filter_Char, bias_array_Int, out_Char);
+
 
   #endif
 
@@ -272,7 +178,7 @@ int main() {
   run_time = (omp_get_wtime() - start_time);
 
   double FLOPS = (double)Input_Output_batch_dim * Output_Y_dim * Output_X_dim * Output_depth_dim;
-  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/10);
+  FLOPS = (FLOPS * ((double)2 * Mask_Y_dim * Mask_X_dim * Input_depth_dim + 1)) / (run_time/N);
 
   printf("\n\nTime = %.3e seconds", run_time);
   printf(" or %.0f mseconds", run_time * 1000);//printf time in msecs
@@ -368,11 +274,12 @@ unsigned short int equal_Char(unsigned char const a, unsigned char const b) {
 
 void read_layer_dimensions() {
 
-  // x & y are assumed square, multiples of 4
-  // in & output depth are assumed powers of 2 greater than 32
+  // the layer is assumed to NOT be an initial layer, thus the in/output depths are assumed to be powers of 2, of at least 16.
 
-    // Input_Output_batch_dim=2000;
-    Input_Output_batch_dim=20;
+
+    // Input_Output_batch_dim=2000;        // ideal for quantised functions
+    Input_Output_batch_dim=200;      // ideal for non-quantised, optimised (OMP) functions
+    // Input_Output_batch_dim=20;
     Input_Y_dim=54;
     Input_X_dim=54;
     Input_depth_dim=256;
@@ -642,12 +549,12 @@ int load_filter_array_FP() {
             filter_Char[offset] = (signed char)fmin(filter_FP[offset]/ scale, SCHAR_MAX);
             filter_Char[offset + 1] = (signed char)fmax(filter_FP[offset+1]/ scale, SCHAR_MIN);
 
-            // dequantistaion for debugging:
-            val = filter_Char[offset] * scale;
-            val2 = filter_Char[offset + 1] * scale;
+            // // dequantistaion for debugging:
+            // val = filter_Char[offset] * scale;
+            // val2 = filter_Char[offset + 1] * scale;
 
             // 1st asymmetric quantisation attempt:
-            // filter_Char[offset] = (signed char)((filter_FP[offset] / -scale) + zero_point);
+            // filter_Char[offset] = (signed char)((filter_FP[offset] / scale) + zero_point);
             // filter_Char[offset + 1] = (signed char)((filter_FP[offset + 1] / scale) + zero_point);
 
             // asymmetric de-quantisation for debugging:

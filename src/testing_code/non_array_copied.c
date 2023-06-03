@@ -1,4 +1,6 @@
-#include "../convolution_layer_2D.h"
+#include "non_array_copied.h"
+
+
 
 // vectorised d loop, using hadd instructions
 // 23 GFLOPS
@@ -11777,7 +11779,7 @@ int optimised_layer_v6_x2m4_left_shift_FP(const float* in_FP, const float* filte
       }
     }
   }
-
+  #undef left_shift
   printf("\n from optv6 x2 m4 - strength reduction %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
   return 0;
 }
@@ -12002,7 +12004,7 @@ int optimised_layer_v6_x2m4_left_shift_opt_FP(const float* in_FP, const float* f
       }
     }
   }
-
+  #undef left_shift
   printf("\n from optv6 x2 m4 - strength reduction %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
   return 0;
 }
@@ -14079,7 +14081,7 @@ int optimised_layer_v7_x2m4_ops_outside_loop_FP(const float* in_FP, const float*
 }
 
 
-// applied left shift where possible - optimised_layer_v5_x3m3_loop_interchange_m_FP()
+// applied left shift where possible - optimised_layer_v6_x3m3_left_shift_FP()
 // ~86 GFLOPS, 
 int optimised_layer_v7_x3m3_ops_outside_loop_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
   #define left_shift(x) (__builtin_ctz(x))  // inline function effectively using inline assembly to return num of trailing zeros (i.e. 128 returns 7, 2 * 128 == 2 << 7)
@@ -17242,7 +17244,7 @@ int optimised_layer_v10_x3m3_const_FP(const float* in_FP, const float* filter_FP
 
 
 
-// v11 declare vars inside of loop body - using v9 & v10 funcs as base
+// v11 declare vars inside of loop body - using v10 funcs as base
 
 
 // declaring vars inside of loop body if possible - optimised_layer_v9_x2m4_omp_collapsed_FP()
@@ -17910,7 +17912,7 @@ int optimised_layer_v11_x3m3_var_declaration_FP(const float* in_FP, const float*
 
 
 // replacing add/ mul intrinsics with fmadd - optimised_layer_v11_x2m4_var_declaration_FP()
-// ~507 GFLOPS
+// ~519 GFLOPS
 int optimised_layer_v12_x2m4_fmadd_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
   #define left_shift(x) (__builtin_ctz(x))  // inline function effectively using inline assembly to return num of trailing zeros (i.e. 128 returns 7, 2 * 128 == 2 << 7)
   #define RELU(x) ((x) < 0.0f ? 0.0f : (x)) // return x if greater than 0, else return 0
@@ -19360,5 +19362,2778 @@ int optimised_layer_v13_x3m3_loop_tiling_m_FP(const float* in_FP, const float* f
 
 
 
-// unroll d again
-// v14 unroll d - using v12 & 13 funcs as base
+// v14 cleaned - cleaning up code (trying optimisations that didn't give perf increase before, or were missed, improving readability, etc)
+
+
+// unrolled d by factor of 4, replaced left_shift calls with const var, moving parts of subscript calc outside loops had negative perf impact - optimised_layer_v12_x2m4_fmadd_FP()
+// ~525 GFLOPS
+int optimised_layer_v14_x2m4_cleaned_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  #define left_shift(x) (__builtin_ctz(x))  // inline function effectively using inline assembly to return num of trailing zeros (i.e. 128 returns 7, 2 * 128 == 2 << 7)
+  #define RELU(x) ((x) < 0.0f ? 0.0f : (x)) // return x if greater than 0, else return 0
+
+  // float bias, bias2, bias3, bias4;
+  // __m256 temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8;
+
+  const unsigned long long int in_l_shift = left_shift(Input_depth_dim);
+  const unsigned long long int out_l_shift = left_shift(Output_depth_dim);
+
+  const unsigned long long int in_yx_depth = Input_Y_dim * Input_X_dim << in_l_shift;
+  const unsigned long long int in_x_depth = Input_X_dim  << in_l_shift;
+
+  const unsigned long long int mask_yx_depth = Mask_Y_dim * Mask_X_dim << in_l_shift;
+  const unsigned long long int mask_x_depth = Mask_X_dim << in_l_shift;
+
+  const unsigned long long int out_yx_depth = Output_X_dim * Output_Y_dim << out_l_shift;
+  const unsigned long long int out_x_depth = Output_X_dim << out_l_shift;
+
+  #pragma omp parallel for shared(in_yx_depth, in_x_depth, mask_yx_depth, mask_x_depth, out_yx_depth, out_x_depth) \
+    default(shared) collapse(2) schedule(static)
+  {
+    for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+      // const unsigned long long int b_in = b * in_yx_depth;
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        // const unsigned long long int y_stride = y * Stride_Y_dim;
+
+        for (unsigned int m = 0; m < Output_depth_dim; m+=4) { //channels
+          // const unsigned long long int m_mask = m * mask_yx_depth;
+
+          const float bias = bias_array_FP[m];
+          const float bias2 = bias_array_FP[m+1];
+          const float bias3 = bias_array_FP[m+2];
+          const float bias4 = bias_array_FP[m+3];
+
+          for (unsigned int x = 0; x < Output_X_dim; x+=2) {	//Output Width
+            // const unsigned long long int x_stride = x * Stride_X_dim;
+
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            __m256 temp4 = _mm256_setzero_ps();
+            __m256 temp5 = _mm256_setzero_ps();
+            __m256 temp6 = _mm256_setzero_ps();
+            __m256 temp7 = _mm256_setzero_ps();
+            __m256 temp8 = _mm256_setzero_ps();
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              // const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              // const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                // const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                // const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  // performing common subscript elim on subscripts still result in perf decrease
+                  const unsigned long long int in_subscript = (b * in_yx_depth)
+                    + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                    + ((x * Stride_X_dim + off_x) << in_l_shift)
+                    + d;
+
+                  const unsigned long long int filter_subscript = (m * mask_yx_depth)
+                    + (off_y * mask_x_depth)
+                    + (off_x << in_l_shift)
+                    + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                  __m256 s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                  __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                  __m256 w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+                  __m256 w4 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w2, temp3);
+                  temp4 = _mm256_fmadd_ps(s2, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w3, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w3, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w4, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w4, temp8);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;           // using this, or direct addition to subscript makes no/ little difference as it gets optimised out regardless
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim + 8]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 8]);
+                  w3 = _mm256_load_ps(&filter_FP[filter_subscript + 8 + mask_yx_depth + mask_yx_depth]);
+                  w4 = _mm256_load_ps(&filter_FP[filter_subscript + 8 + mask_yx_depth + mask_yx_depth + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w2, temp3);
+                  temp4 = _mm256_fmadd_ps(s2, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w3, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w3, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w4, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w4, temp8);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim + 16]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 16]);
+                  w3 = _mm256_load_ps(&filter_FP[filter_subscript + 16 + mask_yx_depth + mask_yx_depth]);
+                  w4 = _mm256_load_ps(&filter_FP[filter_subscript + 16 + mask_yx_depth + mask_yx_depth + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w2, temp3);
+                  temp4 = _mm256_fmadd_ps(s2, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w3, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w3, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w4, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w4, temp8);
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim + 24]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 24]);
+                  w3 = _mm256_load_ps(&filter_FP[filter_subscript + 24 + mask_yx_depth + mask_yx_depth]);
+                  w4 = _mm256_load_ps(&filter_FP[filter_subscript + 24 + mask_yx_depth + mask_yx_depth + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w2, temp3);
+                  temp4 = _mm256_fmadd_ps(s2, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w3, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w3, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w4, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w4, temp8);
+
+                }
+              }
+            }
+
+
+            const unsigned long long int out_subscript = b * (out_yx_depth) 
+              + y * (out_x_depth) 
+              + (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + Output_depth_dim;
+
+
+
+            temp = _mm256_hadd_ps(temp, temp);
+            temp = _mm256_hadd_ps(temp, temp);
+            __m128 tempLo = _mm256_castps256_ps128(temp);
+            __m128 tempHi = _mm256_extractf128_ps(temp, 1);
+            __m128 sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum = _mm_cvtss_f32(sseSum);
+
+            sum += bias;
+            out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+            temp2 = _mm256_hadd_ps(temp2, temp2);
+            temp2 = _mm256_hadd_ps(temp2, temp2);
+            __m128 tempLo2 = _mm256_castps256_ps128(temp2);
+            __m128 tempHi2 = _mm256_extractf128_ps(temp2, 1);
+            __m128 sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum2 = _mm_cvtss_f32(sseSum2);
+
+            sum2 += bias;
+            out_to_compare_with_FP[out_subscript2] = RELU(sum2);
+
+
+            temp3 = _mm256_hadd_ps(temp3, temp3);
+            temp3 = _mm256_hadd_ps(temp3, temp3);
+            tempLo = _mm256_castps256_ps128(temp3);
+            tempHi = _mm256_extractf128_ps(temp3, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum3 = _mm_cvtss_f32(sseSum);
+
+            sum3 += bias2;
+            out_to_compare_with_FP[out_subscript + 1] = RELU(sum3);
+
+
+            temp4 = _mm256_hadd_ps(temp4, temp4);
+            temp4 = _mm256_hadd_ps(temp4, temp4);
+            tempLo2 = _mm256_castps256_ps128(temp4);
+            tempHi2 = _mm256_extractf128_ps(temp4, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum4 = _mm_cvtss_f32(sseSum2);
+
+            sum4 += bias2;
+            out_to_compare_with_FP[out_subscript2 + 1] = RELU(sum4);
+
+
+            temp5 = _mm256_hadd_ps(temp5, temp5);
+            temp5 = _mm256_hadd_ps(temp5, temp5);
+            tempLo = _mm256_castps256_ps128(temp5);
+            tempHi = _mm256_extractf128_ps(temp5, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum5 = _mm_cvtss_f32(sseSum);
+
+            sum5 += bias3;
+            out_to_compare_with_FP[out_subscript + 2] = RELU(sum5);
+
+
+            temp6 = _mm256_hadd_ps(temp6, temp6);
+            temp6 = _mm256_hadd_ps(temp6, temp6);
+            tempLo2 = _mm256_castps256_ps128(temp6);
+            tempHi2 = _mm256_extractf128_ps(temp6, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum6 = _mm_cvtss_f32(sseSum2);
+
+            sum6 += bias3;
+            out_to_compare_with_FP[out_subscript2 + 2] = RELU(sum6);
+
+
+            temp7 = _mm256_hadd_ps(temp7, temp7);
+            temp7 = _mm256_hadd_ps(temp7, temp7);
+            tempLo = _mm256_castps256_ps128(temp7);
+            tempHi = _mm256_extractf128_ps(temp7, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum7 = _mm_cvtss_f32(sseSum);
+
+            sum7 += bias4;
+            out_to_compare_with_FP[out_subscript + 3] = RELU(sum7);
+
+
+            temp8 = _mm256_hadd_ps(temp8, temp8);
+            temp8 = _mm256_hadd_ps(temp8, temp8);
+            tempLo2 = _mm256_castps256_ps128(temp8);
+            tempHi2 = _mm256_extractf128_ps(temp8, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum8 = _mm_cvtss_f32(sseSum2);
+
+            sum8 += bias4;
+            out_to_compare_with_FP[out_subscript2 + 3] = RELU(sum8);
+          }
+        }
+      }
+    }
+  }
+  #undef left_shift
+  #undef RELU
+  printf("\n from optv14 x2 m4 - cleaned %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  return 0;
+}
+
+
+// added const, removed loadu, common subexpression elimination, unrolled d loops, reduced simd register pressure in x loop, optimised hadd(no real difference)  - optimised_layer_v12_x3m3_fmadd_FP()
+// ~625 GFLOPS
+int optimised_layer_v14_x3m3_cleaned_FP_AC(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  #define left_shift(x) (__builtin_ctz(x))  // inline function effectively using inline assembly to return num of trailing zeros (i.e. 128 returns 7, 2 * 128 == 2 << 7)
+  #define RELU(x) ((x) < 0.0f ? 0.0f : (x)) // return x if greater than 0, else return 0
+  
+  // float bias, bias2, bias3;
+  // __m256 temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8, temp9;
+
+  const unsigned long long int in_l_shift = left_shift(Input_depth_dim);
+  const unsigned long long int out_l_shift = left_shift(Output_depth_dim);
+
+  const unsigned long long int in_yx_depth = Input_Y_dim * Input_X_dim << in_l_shift;
+  const unsigned long long int in_x_depth = Input_X_dim  << in_l_shift;
+
+  const unsigned long long int mask_yx_depth = Mask_Y_dim * Mask_X_dim << in_l_shift;
+  const unsigned long long int mask_x_depth = Mask_X_dim << in_l_shift;
+
+  const unsigned long long int out_yx_depth = Output_X_dim * Output_Y_dim << out_l_shift;
+  const unsigned long long int out_x_depth = Output_X_dim << out_l_shift;
+
+  // Calculate loop bounds for unrolled loops
+  const unsigned int m_bound = (Output_depth_dim/ 3) * 3;
+  const unsigned int x_bound = (Output_X_dim/ 3) * 3; 
+
+  unsigned int m, x;
+  #pragma omp parallel for private(m, x) shared(in_yx_depth, in_x_depth, mask_yx_depth, mask_x_depth, out_yx_depth, out_x_depth, m_bound, x_bound) \
+    default(shared) collapse(2) schedule(static)
+  {
+    for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+        const unsigned long long int b_in = b * in_yx_depth;
+        const unsigned long long int b_out = b * out_yx_depth;
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        const unsigned long long int y_stride = y * Stride_Y_dim;
+        const unsigned long long int y_out = y * out_x_depth;
+
+        for (m = 0; m < m_bound; m+=3) { //channels
+          const unsigned long long int m_mask = m * mask_yx_depth;
+
+          const float bias = bias_array_FP[m];
+          const float bias2 = bias_array_FP[m+1];
+          const float bias3 = bias_array_FP[m+2];
+
+          for (x = 0; x < x_bound; x+=3) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            __m256 temp4 = _mm256_setzero_ps();
+            __m256 temp5 = _mm256_setzero_ps();
+            __m256 temp6 = _mm256_setzero_ps();
+            __m256 temp7 = _mm256_setzero_ps();
+            __m256 temp8 = _mm256_setzero_ps();
+            __m256 temp9 = _mm256_setzero_ps();
+            // temp = 0.0f;
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  const unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+                  // unsigned long long int in_subscript2 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+1) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+                  // unsigned long long int in_subscript3 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+2) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+
+
+                  unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+                  // unsigned long long int filter_subscript2 = ((m+1) * mask_yx_depth)
+                  //   + (off_y * mask_x_depth)
+                  //   + (off_x << in_l_shift)
+                  //   + d;
+                  // unsigned long long int filter_subscript3 = ((m+2) * mask_yx_depth)
+                  //   + (off_y * mask_x_depth)
+                  //   + (off_x << in_l_shift)
+                  //   + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                  __m256 s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim]);
+                  __m256 s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift)]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]); 
+                  __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                  __m256 w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s2, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s3, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w3, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w3, temp8);
+                  temp9 = _mm256_fmadd_ps(s3, w3, temp9);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 8 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 8 + (2 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript]); 
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s2, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s3, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w3, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w3, temp8);
+                  temp9 = _mm256_fmadd_ps(s3, w3, temp9);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 16 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 16 + (2 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript]); 
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s2, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s3, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w3, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w3, temp8);
+                  temp9 = _mm256_fmadd_ps(s3, w3, temp9);
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 24 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 24 + (2 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript]); 
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s2, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s3, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w3, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w3, temp8);
+                  temp9 = _mm256_fmadd_ps(s3, w3, temp9);
+                }
+              }
+            }
+
+
+            const unsigned long long int out_subscript = b_out +
+              y_out +
+              (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + Output_depth_dim;
+            const unsigned long long int out_subscript3 = out_subscript + (2 << out_l_shift);
+            const unsigned long long int out_subscript4 = out_subscript + 1;
+            const unsigned long long int out_subscript5 = out_subscript + 1 + Output_depth_dim;
+            const unsigned long long int out_subscript6 = out_subscript + 1 + (2 << out_l_shift);
+            const unsigned long long int out_subscript7 = out_subscript + 2;
+            const unsigned long long int out_subscript8 = out_subscript + 2 + Output_depth_dim;
+            const unsigned long long int out_subscript9 = out_subscript + 2 + (2 << out_l_shift);
+
+            // unsigned long long int out_subscript2 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+1) << out_l_shift)
+            //   + m;
+            // unsigned long long int out_subscript3 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+2) << out_l_shift)
+            //   + m;
+            // unsigned long long int out_subscript4 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   (x << out_l_shift)
+            //   + (m+1);
+            // unsigned long long int out_subscript5 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+1) << out_l_shift)
+            //   + (m+1);
+            // unsigned long long int out_subscript6 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+2) << out_l_shift)
+            //   + (m+1);
+            // unsigned long long int out_subscript7 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   (x << out_l_shift)
+            //   + (m+2);
+            // unsigned long long int out_subscript8 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+1) << out_l_shift)
+            //   + (m+2);
+            // unsigned long long int out_subscript9 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+2) << out_l_shift)
+            //   + (m+2);
+
+
+            __m128 sseLo = _mm256_castps256_ps128(temp);
+						__m128 sseHi = _mm256_extractf128_ps(temp, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						__m128 sseShuf = _mm_movehdup_ps(sseLo);
+						__m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						float sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp2);
+						 sseHi = _mm256_extractf128_ps(temp2, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript2] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp3);
+						 sseHi = _mm256_extractf128_ps(temp3, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript3] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp4);
+						 sseHi = _mm256_extractf128_ps(temp4, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias2;
+						out_to_compare_with_FP[out_subscript4] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp5);
+						 sseHi = _mm256_extractf128_ps(temp5, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias2;
+						out_to_compare_with_FP[out_subscript5] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp6);
+						 sseHi = _mm256_extractf128_ps(temp6, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias2;
+						out_to_compare_with_FP[out_subscript6] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp7);
+						 sseHi = _mm256_extractf128_ps(temp7, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias3;
+						out_to_compare_with_FP[out_subscript7] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp8);
+						 sseHi = _mm256_extractf128_ps(temp8, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias3;
+						out_to_compare_with_FP[out_subscript8] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp9);
+						 sseHi = _mm256_extractf128_ps(temp9, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias3;
+						out_to_compare_with_FP[out_subscript9] = RELU(sum);
+
+
+            // inefficient hadd *********
+
+            // temp = _mm256_hadd_ps(temp, temp);
+            // temp = _mm256_hadd_ps(temp, temp);
+            // __m128 tempLo = _mm256_castps256_ps128(temp);
+            // __m128 tempHi = _mm256_extractf128_ps(temp, 1);
+            // __m128 sseSum = _mm_add_ps(tempLo, tempHi);
+
+            // float sum = _mm_cvtss_f32(sseSum);
+
+            // sum += bias;
+            // out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+            // temp2 = _mm256_hadd_ps(temp2, temp2);
+            // temp2 = _mm256_hadd_ps(temp2, temp2);
+            // __m128 tempLo2 = _mm256_castps256_ps128(temp2);
+            // __m128 tempHi2 = _mm256_extractf128_ps(temp2, 1);
+            // __m128 sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            // float sum2 = _mm_cvtss_f32(sseSum2);
+
+            // sum2 += bias;
+            // out_to_compare_with_FP[out_subscript2] = RELU(sum2);
+
+
+            // temp3 = _mm256_hadd_ps(temp3, temp3);
+            // temp3 = _mm256_hadd_ps(temp3, temp3);
+            //  tempLo = _mm256_castps256_ps128(temp3);
+            //  tempHi = _mm256_extractf128_ps(temp3, 1);
+            //  sseSum = _mm_add_ps(tempLo, tempHi);
+
+            // float sum3 = _mm_cvtss_f32(sseSum);
+
+            // sum3 += bias;
+            // out_to_compare_with_FP[out_subscript3] = RELU(sum3);
+
+
+            // temp4 = _mm256_hadd_ps(temp4, temp4);
+            // temp4 = _mm256_hadd_ps(temp4, temp4);
+            //  tempLo2 = _mm256_castps256_ps128(temp4);
+            //  tempHi2 = _mm256_extractf128_ps(temp4, 1);
+            //  sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            // float sum4 = _mm_cvtss_f32(sseSum2);
+
+            // sum4 += bias2;
+            // out_to_compare_with_FP[out_subscript4] = RELU(sum4);
+
+
+            // temp5 = _mm256_hadd_ps(temp5, temp5);
+            // temp5 = _mm256_hadd_ps(temp5, temp5);
+            //  tempLo = _mm256_castps256_ps128(temp5);
+            //  tempHi = _mm256_extractf128_ps(temp5, 1);
+            //  sseSum = _mm_add_ps(tempLo, tempHi);
+
+            // float sum5 = _mm_cvtss_f32(sseSum);
+
+            // sum5 += bias2;
+            // out_to_compare_with_FP[out_subscript5] = RELU(sum5);
+
+
+            // temp6 = _mm256_hadd_ps(temp6, temp6);
+            // temp6 = _mm256_hadd_ps(temp6, temp6);
+            //  tempLo2 = _mm256_castps256_ps128(temp6);
+            //  tempHi2 = _mm256_extractf128_ps(temp6, 1);
+            //  sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            // float sum6 = _mm_cvtss_f32(sseSum2);
+
+            // sum6 += bias2;
+            // out_to_compare_with_FP[out_subscript6] = RELU(sum6);
+
+
+            // temp7 = _mm256_hadd_ps(temp7, temp7);
+            // temp7 = _mm256_hadd_ps(temp7, temp7);
+            //  tempLo = _mm256_castps256_ps128(temp7);
+            //  tempHi = _mm256_extractf128_ps(temp7, 1);
+            //  sseSum = _mm_add_ps(tempLo, tempHi);
+
+            // float sum7 = _mm_cvtss_f32(sseSum);
+
+            // sum7 += bias3;
+            // out_to_compare_with_FP[out_subscript7] = RELU(sum7);
+
+
+            // temp8 = _mm256_hadd_ps(temp8, temp8);
+            // temp8 = _mm256_hadd_ps(temp8, temp8);
+            //  tempLo2 = _mm256_castps256_ps128(temp8);
+            //  tempHi2 = _mm256_extractf128_ps(temp8, 1);
+            //  sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            // float sum8 = _mm_cvtss_f32(sseSum2);
+
+            // sum8 += bias3;
+            // out_to_compare_with_FP[out_subscript8] = RELU(sum8);
+
+
+            // temp9 = _mm256_hadd_ps(temp9, temp9);
+            // temp9 = _mm256_hadd_ps(temp9, temp9);
+            //  tempLo = _mm256_castps256_ps128(temp9);
+            //  tempHi = _mm256_extractf128_ps(temp9, 1);
+            //  sseSum = _mm_add_ps(tempLo, tempHi);
+
+            // float sum9 = _mm_cvtss_f32(sseSum);
+
+            // sum9 += bias3;
+            // out_to_compare_with_FP[out_subscript9] = RELU(sum9);
+          }
+          // overflow/ fallback x loop
+          for (; x < Output_X_dim; x++) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  const unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+
+                  const unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+                  // unsigned long long int filter_subscript2 = ((m+1) * mask_yx_depth)
+                  //   + (off_y * mask_x_depth)
+                  //   + (off_x << in_l_shift)
+                  //   + d;
+                  // unsigned long long int filter_subscript3 = ((m+2) * mask_yx_depth)
+                  //   + (off_y * mask_x_depth)
+                  //   + (off_x << in_l_shift)
+                  //   + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                  __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                  __m256 w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w3, temp3);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + 8 + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + 8 + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w3, temp3);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + 16 + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + 16 + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w3, temp3);
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + 24 + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + 24 + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w3, temp3);
+                }
+              }
+            }
+            const unsigned long long int out_subscript = b_out +
+              y_out +
+              (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + 1;
+            const unsigned long long int out_subscript3 = out_subscript + 2;
+            // unsigned long long int out_subscript2 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   (x << out_l_shift)
+            //   + (m+1);
+            // unsigned long long int out_subscript3 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   (x << out_l_shift)
+            //   + (m+2);
+
+
+
+            __m128 sseLo = _mm256_castps256_ps128(temp);
+						__m128 sseHi = _mm256_extractf128_ps(temp, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						__m128 sseShuf = _mm_movehdup_ps(sseLo);
+						__m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						float sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp2);
+						 sseHi = _mm256_extractf128_ps(temp2, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias2;
+						out_to_compare_with_FP[out_subscript2] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp3);
+						 sseHi = _mm256_extractf128_ps(temp3, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias3;
+						out_to_compare_with_FP[out_subscript3] = RELU(sum);
+
+
+            // temp = _mm256_hadd_ps(temp, temp);
+            // temp = _mm256_hadd_ps(temp, temp);
+            // __m128 tempLo = _mm256_castps256_ps128(temp);
+            // __m128 tempHi = _mm256_extractf128_ps(temp, 1);
+            // __m128 sseSum = _mm_add_ps(tempLo, tempHi);
+
+            // float sum = _mm_cvtss_f32(sseSum);
+
+            // sum += bias;
+            // out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+            // temp2 = _mm256_hadd_ps(temp2, temp2);
+            // temp2 = _mm256_hadd_ps(temp2, temp2);
+            // __m128 tempLo2 = _mm256_castps256_ps128(temp2);
+            // __m128 tempHi2 = _mm256_extractf128_ps(temp2, 1);
+            // __m128 sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            // float sum2 = _mm_cvtss_f32(sseSum2);
+
+            // sum2 += bias2;
+            // out_to_compare_with_FP[out_subscript2] = RELU(sum2);
+
+
+            // temp3 = _mm256_hadd_ps(temp3, temp3);
+            // temp3 = _mm256_hadd_ps(temp3, temp3);
+            // __m128 tempLo3 = _mm256_castps256_ps128(temp3);
+            // __m128 tempHi3 = _mm256_extractf128_ps(temp3, 1);
+            // __m128 sseSum3 = _mm_add_ps(tempLo3, tempHi3);
+
+            // float sum3 = _mm_cvtss_f32(sseSum3);
+
+            // sum3 += bias3;
+            // out_to_compare_with_FP[out_subscript3] = RELU(sum3);
+
+          }
+        }
+        for (; m < Output_depth_dim; m++) {
+          const unsigned long long int m_mask = m * mask_yx_depth;
+
+          const float bias = bias_array_FP[m];
+
+          for (unsigned int x = 0; x < Output_X_dim; x+=4) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            __m256 temp4 = _mm256_setzero_ps();
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  const unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+                  // unsigned long long int in_subscript2 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+1) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+                  // unsigned long long int in_subscript3 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+2) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+                  // unsigned long long int in_subscript4 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+3) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+
+                  const unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                  __m256 s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim]);
+                  __m256 s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift)]);
+                  __m256 s4 = _mm256_load_ps(&in_FP[in_subscript + (3 << in_l_shift)]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 8 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 8 + (2 << in_l_shift)]);
+                   s4 = _mm256_load_ps(&in_FP[in_subscript + 8 + (3 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 168]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 16 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 16 + (2 << in_l_shift)]);
+                   s4 = _mm256_load_ps(&in_FP[in_subscript + 16 + (3 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 24 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 24 + (2 << in_l_shift)]);
+                   s4 = _mm256_load_ps(&in_FP[in_subscript + 24 + (3 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+
+                }
+              }
+            }
+
+            const unsigned long long int out_subscript = b_out +
+              y_out +
+              (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + Output_depth_dim;
+            const unsigned long long int out_subscript3 = out_subscript + (2 << out_l_shift);
+            const unsigned long long int out_subscript4 = out_subscript + (3 << out_l_shift);
+            // unsigned long long int out_subscript2 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+1) << out_l_shift)
+            //   + m;
+            // unsigned long long int out_subscript3 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+2) << out_l_shift)
+            //   + m;
+            // unsigned long long int out_subscript4 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+3) << out_l_shift)
+            //   + m;
+
+
+
+            __m128 sseLo = _mm256_castps256_ps128(temp);
+						__m128 sseHi = _mm256_extractf128_ps(temp, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						__m128 sseShuf = _mm_movehdup_ps(sseLo);
+						__m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						float sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp2);
+						 sseHi = _mm256_extractf128_ps(temp2, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript2] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp3);
+						 sseHi = _mm256_extractf128_ps(temp3, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript3] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp4);
+						 sseHi = _mm256_extractf128_ps(temp4, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript4] = RELU(sum);
+
+
+            // temp = _mm256_hadd_ps(temp, temp);
+            // temp = _mm256_hadd_ps(temp, temp);
+            // __m128 tempLo = _mm256_castps256_ps128(temp);
+            // __m128 tempHi = _mm256_extractf128_ps(temp, 1);
+            // __m128 sseSum = _mm_add_ps(tempLo, tempHi);
+
+            // float sum = _mm_cvtss_f32(sseSum);
+
+            // sum += bias;
+            // out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+            // temp2 = _mm256_hadd_ps(temp2, temp2);
+            // temp2 = _mm256_hadd_ps(temp2, temp2);
+            // __m128 tempLo2 = _mm256_castps256_ps128(temp2);
+            // __m128 tempHi2 = _mm256_extractf128_ps(temp2, 1);
+            // __m128 sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            // float sum2 = _mm_cvtss_f32(sseSum2);
+
+            // sum2 += bias;
+            // out_to_compare_with_FP[out_subscript2] = RELU(sum2);
+
+
+            // temp3 = _mm256_hadd_ps(temp3, temp3);
+            // temp3 = _mm256_hadd_ps(temp3, temp3);
+            // __m128 tempLo3 = _mm256_castps256_ps128(temp3);
+            // __m128 tempHi3 = _mm256_extractf128_ps(temp3, 1);
+            // __m128 sseSum3 = _mm_add_ps(tempLo3, tempHi3);
+
+            // float sum3 = _mm_cvtss_f32(sseSum3);
+
+            // sum3 += bias;
+            // out_to_compare_with_FP[out_subscript3] = RELU(sum3);
+
+
+            // temp4 = _mm256_hadd_ps(temp4, temp4);
+            // temp4 = _mm256_hadd_ps(temp4, temp4);
+            // __m128 tempLo4 = _mm256_castps256_ps128(temp4);
+            // __m128 tempHi4 = _mm256_extractf128_ps(temp4, 1);
+            // __m128 sseSum4 = _mm_add_ps(tempLo4, tempHi4);
+
+            // float sum4 = _mm_cvtss_f32(sseSum4);
+
+            // sum4 += bias;
+            // out_to_compare_with_FP[out_subscript4] = RELU(sum4);
+
+          }
+        }
+      }
+    }
+  }
+  #undef left_shift
+  #undef RELU
+  printf("\n from optv14 x3 m3 - cleaned code %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  return 0;
+}
+
+
+// unrolled d by factor of 4, replaced left_shift calls with const var, sub expression elim positive impact
+// ~598 GFLOPS
+int optimised_layer_v14_x4m2_cleaned_FP(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  #define left_shift(x) (__builtin_ctz(x))  // inline function effectively using inline assembly to return num of trailing zeros (i.e. 128 returns 7, 2 * 128 == 2 << 7)
+  #define RELU(x) ((x) < 0.0f ? 0.0f : (x)) // return x if greater than 0, else return 0
+
+  // float bias, bias2, bias3, bias4;
+  // __m256 temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8;
+
+  const unsigned long long int in_l_shift = left_shift(Input_depth_dim);
+  const unsigned long long int out_l_shift = left_shift(Output_depth_dim);
+
+  const unsigned long long int in_yx_depth = Input_Y_dim * Input_X_dim << in_l_shift;
+  const unsigned long long int in_x_depth = Input_X_dim  << in_l_shift;
+
+  const unsigned long long int mask_yx_depth = Mask_Y_dim * Mask_X_dim << in_l_shift;
+  const unsigned long long int mask_x_depth = Mask_X_dim << in_l_shift;
+
+  const unsigned long long int out_yx_depth = Output_X_dim * Output_Y_dim << out_l_shift;
+  const unsigned long long int out_x_depth = Output_X_dim << out_l_shift;
+
+  #pragma omp parallel for shared(in_yx_depth, in_x_depth, mask_yx_depth, mask_x_depth, out_yx_depth, out_x_depth) \
+    default(shared) collapse(2) schedule(static)
+  {
+    for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+      const unsigned long long int b_in = b * in_yx_depth;
+      const unsigned long long int b_out = b * out_yx_depth;
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        const unsigned long long int y_stride = y * Stride_Y_dim;
+        const unsigned long long int y_out = y * out_x_depth;
+
+        for (unsigned int m = 0; m < Output_depth_dim; m+=2) { //channels
+          const unsigned long long int m_mask = m * mask_yx_depth;
+
+          const float bias = bias_array_FP[m];
+          const float bias2 = bias_array_FP[m+1];
+
+          for (unsigned int x = 0; x < Output_X_dim; x+=4) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            __m256 temp4 = _mm256_setzero_ps();
+            __m256 temp5 = _mm256_setzero_ps();
+            __m256 temp6 = _mm256_setzero_ps();
+            __m256 temp7 = _mm256_setzero_ps();
+            __m256 temp8 = _mm256_setzero_ps();
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  // performing common subscript elim on subscripts result in perf increase in x4 for some reason
+                  const unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+
+                  const unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                  __m256 s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim]);
+                  __m256 s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift)]);
+                  __m256 s4 = _mm256_load_ps(&in_FP[in_subscript + (3 << in_l_shift)]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                  __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;           // using this, or direct addition to subscript makes no/ little difference as it gets optimised out regardless
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim + 8]);
+                  s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift) + 8]);
+                  s4 = _mm256_load_ps(&in_FP[in_subscript + (3 << in_l_shift) + 8]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 8]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim + 16]);
+                  s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift) + 16]);
+                  s4 = _mm256_load_ps(&in_FP[in_subscript + (3 << in_l_shift) + 16]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 16]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim + 24]);
+                  s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift) + 24]);
+                  s4 = _mm256_load_ps(&in_FP[in_subscript + (3 << in_l_shift) + 24]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 24]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                }
+              }
+            }
+
+
+            const unsigned long long int out_subscript = b_out 
+              + y_out
+              + (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + Output_depth_dim;
+            const unsigned long long int out_subscript3 = out_subscript + (2 << out_l_shift);
+            const unsigned long long int out_subscript4 = out_subscript + (3 << out_l_shift);
+
+
+
+            temp = _mm256_hadd_ps(temp, temp);
+            temp = _mm256_hadd_ps(temp, temp);
+            __m128 tempLo = _mm256_castps256_ps128(temp);
+            __m128 tempHi = _mm256_extractf128_ps(temp, 1);
+            __m128 sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum = _mm_cvtss_f32(sseSum);
+
+            sum += bias;
+            out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+            temp2 = _mm256_hadd_ps(temp2, temp2);
+            temp2 = _mm256_hadd_ps(temp2, temp2);
+            __m128 tempLo2 = _mm256_castps256_ps128(temp2);
+            __m128 tempHi2 = _mm256_extractf128_ps(temp2, 1);
+            __m128 sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum2 = _mm_cvtss_f32(sseSum2);
+
+            sum2 += bias;
+            out_to_compare_with_FP[out_subscript2] = RELU(sum2);
+
+
+            temp3 = _mm256_hadd_ps(temp3, temp3);
+            temp3 = _mm256_hadd_ps(temp3, temp3);
+            tempLo = _mm256_castps256_ps128(temp3);
+            tempHi = _mm256_extractf128_ps(temp3, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum3 = _mm_cvtss_f32(sseSum);
+
+            sum3 += bias;
+            out_to_compare_with_FP[out_subscript3] = RELU(sum3);
+
+
+            temp4 = _mm256_hadd_ps(temp4, temp4);
+            temp4 = _mm256_hadd_ps(temp4, temp4);
+            tempLo2 = _mm256_castps256_ps128(temp4);
+            tempHi2 = _mm256_extractf128_ps(temp4, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum4 = _mm_cvtss_f32(sseSum2);
+
+            sum4 += bias;
+            out_to_compare_with_FP[out_subscript4] = RELU(sum4);
+
+
+            temp5 = _mm256_hadd_ps(temp5, temp5);
+            temp5 = _mm256_hadd_ps(temp5, temp5);
+            tempLo = _mm256_castps256_ps128(temp5);
+            tempHi = _mm256_extractf128_ps(temp5, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum5 = _mm_cvtss_f32(sseSum);
+
+            sum5 += bias2;
+            out_to_compare_with_FP[out_subscript + 1] = RELU(sum5);
+
+
+            temp6 = _mm256_hadd_ps(temp6, temp6);
+            temp6 = _mm256_hadd_ps(temp6, temp6);
+            tempLo2 = _mm256_castps256_ps128(temp6);
+            tempHi2 = _mm256_extractf128_ps(temp6, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum6 = _mm_cvtss_f32(sseSum2);
+
+            sum6 += bias2;
+            out_to_compare_with_FP[out_subscript2 + 1] = RELU(sum6);
+
+
+            temp7 = _mm256_hadd_ps(temp7, temp7);
+            temp7 = _mm256_hadd_ps(temp7, temp7);
+            tempLo = _mm256_castps256_ps128(temp7);
+            tempHi = _mm256_extractf128_ps(temp7, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum7 = _mm_cvtss_f32(sseSum);
+
+            sum7 += bias2;
+            out_to_compare_with_FP[out_subscript3 + 1] = RELU(sum7);
+
+
+            temp8 = _mm256_hadd_ps(temp8, temp8);
+            temp8 = _mm256_hadd_ps(temp8, temp8);
+            tempLo2 = _mm256_castps256_ps128(temp8);
+            tempHi2 = _mm256_extractf128_ps(temp8, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum8 = _mm_cvtss_f32(sseSum2);
+
+            sum8 += bias2;
+            out_to_compare_with_FP[out_subscript4 + 1] = RELU(sum8);
+          }
+        }
+      }
+    }
+  }
+  #undef left_shift
+  #undef RELU
+  printf("\n from optv14 x4 m2 - cleaned %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  return 0;
+}
+
+
+
+
+
+
+// v15 edge cases - handling edge cases
+
+
+// handling edge cases
+// ~592 GFLOPS
+int optimised_layer_v15_x4m2_edge_cases_AC(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  #define left_shift(x) (__builtin_ctz(x))  // inline function effectively using inline assembly to return num of trailing zeros (i.e. 128 returns 7, 2 * 128 == 2 << 7)
+  #define RELU(x) ((x) < 0.0f ? 0.0f : (x)) // return x if greater than 0, else return 0
+
+  // float bias, bias2, bias3, bias4;
+  // __m256 temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8;
+
+  const unsigned long long int in_l_shift = left_shift(Input_depth_dim);
+  const unsigned long long int out_l_shift = left_shift(Output_depth_dim);
+
+  const unsigned long long int in_yx_depth = Input_Y_dim * Input_X_dim << in_l_shift;
+  const unsigned long long int in_x_depth = Input_X_dim  << in_l_shift;
+
+  const unsigned long long int mask_yx_depth = Mask_Y_dim * Mask_X_dim << in_l_shift;
+  const unsigned long long int mask_x_depth = Mask_X_dim << in_l_shift;
+
+  const unsigned long long int out_yx_depth = Output_X_dim * Output_Y_dim << out_l_shift;
+  const unsigned long long int out_x_depth = Output_X_dim << out_l_shift;
+
+  unsigned int x;
+  const unsigned int x_bound = (Output_X_dim/ 4) * 4; 
+
+  #pragma omp parallel for private(x) shared(x_bound, in_yx_depth, in_x_depth, mask_yx_depth, mask_x_depth, out_yx_depth, out_x_depth) \
+    default(shared) collapse(2) schedule(static)
+  {
+    for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+      const unsigned long long int b_in = b * in_yx_depth;
+      const unsigned long long int b_out = b * out_yx_depth;
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        const unsigned long long int y_stride = y * Stride_Y_dim;
+        const unsigned long long int y_out = y * out_x_depth;
+
+        for (unsigned int m = 0; m < Output_depth_dim; m+=2) { //channels
+          const unsigned long long int m_mask = m * mask_yx_depth;
+
+          const float bias = bias_array_FP[m];
+          const float bias2 = bias_array_FP[m+1];
+
+          for (x = 0; x < x_bound; x+=4) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            __m256 temp4 = _mm256_setzero_ps();
+            __m256 temp5 = _mm256_setzero_ps();
+            __m256 temp6 = _mm256_setzero_ps();
+            __m256 temp7 = _mm256_setzero_ps();
+            __m256 temp8 = _mm256_setzero_ps();
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  // performing common subscript elim on subscripts result in perf increase in x4 for some reason
+                  const unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+
+                  const unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                  __m256 s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim]);
+                  __m256 s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift)]);
+                  __m256 s4 = _mm256_load_ps(&in_FP[in_subscript + (3 << in_l_shift)]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                  __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;           // using this, or direct addition to subscript makes no/ little difference as it gets optimised out regardless
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + 8 + Input_depth_dim]);
+                  s3 = _mm256_load_ps(&in_FP[in_subscript + 8 + (2 << in_l_shift)]);
+                  s4 = _mm256_load_ps(&in_FP[in_subscript + 8 + (3 << in_l_shift)]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + 8 + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + 16 + Input_depth_dim]);
+                  s3 = _mm256_load_ps(&in_FP[in_subscript + 16 + (2 << in_l_shift)]);
+                  s4 = _mm256_load_ps(&in_FP[in_subscript + 16 + (3 << in_l_shift)]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + 16 + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + 24 + Input_depth_dim]);
+                  s3 = _mm256_load_ps(&in_FP[in_subscript + 24 + (2 << in_l_shift)]);
+                  s4 = _mm256_load_ps(&in_FP[in_subscript + 24 + (3 << in_l_shift)]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + 24 + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+                  temp5 = _mm256_fmadd_ps(s, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s2, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s3, w2, temp7);
+                  temp8 = _mm256_fmadd_ps(s4, w2, temp8);
+
+                }
+              }
+            }
+
+
+            const unsigned long long int out_subscript = b_out 
+              + y_out
+              + (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + Output_depth_dim;
+            const unsigned long long int out_subscript3 = out_subscript + (2 << out_l_shift);
+            const unsigned long long int out_subscript4 = out_subscript + (3 << out_l_shift);
+
+
+            temp = _mm256_hadd_ps(temp, temp);
+            temp = _mm256_hadd_ps(temp, temp);
+            __m128 tempLo = _mm256_castps256_ps128(temp);
+            __m128 tempHi = _mm256_extractf128_ps(temp, 1);
+            __m128 sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum = _mm_cvtss_f32(sseSum);
+
+            sum += bias;
+            out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+            temp2 = _mm256_hadd_ps(temp2, temp2);
+            temp2 = _mm256_hadd_ps(temp2, temp2);
+            __m128 tempLo2 = _mm256_castps256_ps128(temp2);
+            __m128 tempHi2 = _mm256_extractf128_ps(temp2, 1);
+            __m128 sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum2 = _mm_cvtss_f32(sseSum2);
+
+            sum2 += bias;
+            out_to_compare_with_FP[out_subscript2] = RELU(sum2);
+
+
+            temp3 = _mm256_hadd_ps(temp3, temp3);
+            temp3 = _mm256_hadd_ps(temp3, temp3);
+            tempLo = _mm256_castps256_ps128(temp3);
+            tempHi = _mm256_extractf128_ps(temp3, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum3 = _mm_cvtss_f32(sseSum);
+
+            sum3 += bias;
+            out_to_compare_with_FP[out_subscript3] = RELU(sum3);
+
+
+            temp4 = _mm256_hadd_ps(temp4, temp4);
+            temp4 = _mm256_hadd_ps(temp4, temp4);
+            tempLo2 = _mm256_castps256_ps128(temp4);
+            tempHi2 = _mm256_extractf128_ps(temp4, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum4 = _mm_cvtss_f32(sseSum2);
+
+            sum4 += bias;
+            out_to_compare_with_FP[out_subscript4] = RELU(sum4);
+
+
+            temp5 = _mm256_hadd_ps(temp5, temp5);
+            temp5 = _mm256_hadd_ps(temp5, temp5);
+            tempLo = _mm256_castps256_ps128(temp5);
+            tempHi = _mm256_extractf128_ps(temp5, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum5 = _mm_cvtss_f32(sseSum);
+
+            sum5 += bias2;
+            out_to_compare_with_FP[out_subscript + 1] = RELU(sum5);
+
+
+            temp6 = _mm256_hadd_ps(temp6, temp6);
+            temp6 = _mm256_hadd_ps(temp6, temp6);
+            tempLo2 = _mm256_castps256_ps128(temp6);
+            tempHi2 = _mm256_extractf128_ps(temp6, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum6 = _mm_cvtss_f32(sseSum2);
+
+            sum6 += bias2;
+            out_to_compare_with_FP[out_subscript2 + 1] = RELU(sum6);
+
+
+            temp7 = _mm256_hadd_ps(temp7, temp7);
+            temp7 = _mm256_hadd_ps(temp7, temp7);
+            tempLo = _mm256_castps256_ps128(temp7);
+            tempHi = _mm256_extractf128_ps(temp7, 1);
+            sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum7 = _mm_cvtss_f32(sseSum);
+
+            sum7 += bias2;
+            out_to_compare_with_FP[out_subscript3 + 1] = RELU(sum7);
+
+
+            temp8 = _mm256_hadd_ps(temp8, temp8);
+            temp8 = _mm256_hadd_ps(temp8, temp8);
+            tempLo2 = _mm256_castps256_ps128(temp8);
+            tempHi2 = _mm256_extractf128_ps(temp8, 1);
+            sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum8 = _mm_cvtss_f32(sseSum2);
+
+            sum8 += bias2;
+            out_to_compare_with_FP[out_subscript4 + 1] = RELU(sum8);
+          }
+          for (; x < Output_depth_dim; x++) {
+            const unsigned long long int x_stride = x * Stride_X_dim;
+
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  // performing common subscript elim on subscripts result in perf increase in x4 for some reason
+                  unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+
+                  unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                  __m256 s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                  __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;           // using this, or direct addition to subscript makes no/ little difference as it gets optimised out regardless
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim + 8]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 8]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+                  s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim + 16]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 16]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                  s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+
+                  w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+                  w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + 24]);
+
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+
+                }
+              }
+            }
+
+
+            unsigned long long int out_subscript = b_out
+              + y_out
+              + (x << out_l_shift)
+              + m;
+            unsigned long long int out_subscript2 = out_subscript + 1;
+
+
+
+            temp = _mm256_hadd_ps(temp, temp);
+            temp = _mm256_hadd_ps(temp, temp);
+            __m128 tempLo = _mm256_castps256_ps128(temp);
+            __m128 tempHi = _mm256_extractf128_ps(temp, 1);
+            __m128 sseSum = _mm_add_ps(tempLo, tempHi);
+
+            float sum = _mm_cvtss_f32(sseSum);
+
+            sum += bias;
+            out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+            temp2 = _mm256_hadd_ps(temp2, temp2);
+            temp2 = _mm256_hadd_ps(temp2, temp2);
+            __m128 tempLo2 = _mm256_castps256_ps128(temp2);
+            __m128 tempHi2 = _mm256_extractf128_ps(temp2, 1);
+            __m128 sseSum2 = _mm_add_ps(tempLo2, tempHi2);
+
+            float sum2 = _mm_cvtss_f32(sseSum2);
+
+            sum2 += bias2;
+            out_to_compare_with_FP[out_subscript2] = RELU(sum2);
+          }
+        }
+      }
+    }
+  }
+  #undef left_shift
+  #undef RELU
+  printf("\n from optv15 x4 m2 - edge cases %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  return 0;
+}
+
+
+// handled edge cases for x on m fallback loop
+// ~623 GFLOPS
+int optimised_layer_v15_x3m3_edge_cases_AC(const float* in_FP, const float* filter_FP, const float* bias_array_FP, float* out_to_compare_with_FP) {
+  #define left_shift(x) (__builtin_ctz(x))  // inline function effectively using inline assembly to return num of trailing zeros (i.e. 128 returns 7, 2 * 128 == 2 << 7)
+  #define RELU(x) ((x) < 0.0f ? 0.0f : (x)) // return x if greater than 0, else return 0
+  
+  // float bias, bias2, bias3;
+  // __m256 temp, temp2, temp3, temp4, temp5, temp6, temp7, temp8, temp9;
+
+  const unsigned long long int in_l_shift = left_shift(Input_depth_dim);
+  const unsigned long long int out_l_shift = left_shift(Output_depth_dim);
+
+  const unsigned long long int in_yx_depth = Input_Y_dim * Input_X_dim << in_l_shift;
+  const unsigned long long int in_x_depth = Input_X_dim  << in_l_shift;
+
+  const unsigned long long int mask_yx_depth = Mask_Y_dim * Mask_X_dim << in_l_shift;
+  const unsigned long long int mask_x_depth = Mask_X_dim << in_l_shift;
+
+  const unsigned long long int out_yx_depth = Output_X_dim * Output_Y_dim << out_l_shift;
+  const unsigned long long int out_x_depth = Output_X_dim << out_l_shift;
+
+  // Calculate loop bounds for unrolled loops
+  const unsigned int m_bound = (Output_depth_dim/ 3) * 3;
+  const unsigned int x_bound = (Output_X_dim/ 3) * 3; 
+  const unsigned int x_bound2 = (Output_X_dim/ 4) * 4; 
+
+  unsigned int m, x;
+  #pragma omp parallel for private(m, x) shared(in_yx_depth, in_x_depth, mask_yx_depth, mask_x_depth, out_yx_depth, out_x_depth, m_bound, x_bound, x_bound2) \
+    default(shared) collapse(2) schedule(static)
+  {
+    for (unsigned int b = 0; b < Input_Output_batch_dim; b++) { //batch
+        const unsigned long long int b_in = b * in_yx_depth;
+        const unsigned long long int b_out = b * out_yx_depth;
+
+      for (unsigned int y = 0; y < Output_Y_dim; y++) {	//Output height
+        const unsigned long long int y_stride = y * Stride_Y_dim;
+        const unsigned long long int y_out = y * out_x_depth;
+
+        for (m = 0; m < m_bound; m+=3) { //channels
+          const unsigned long long int m_mask = m * mask_yx_depth;
+
+          const float bias = bias_array_FP[m];
+          const float bias2 = bias_array_FP[m+1];
+          const float bias3 = bias_array_FP[m+2];
+
+          for (x = 0; x < x_bound; x+=3) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            __m256 temp4 = _mm256_setzero_ps();
+            __m256 temp5 = _mm256_setzero_ps();
+            __m256 temp6 = _mm256_setzero_ps();
+            __m256 temp7 = _mm256_setzero_ps();
+            __m256 temp8 = _mm256_setzero_ps();
+            __m256 temp9 = _mm256_setzero_ps();
+            // temp = 0.0f;
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+                  // unsigned long long int in_subscript2 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+1) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+                  // unsigned long long int in_subscript3 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+2) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+
+
+                  unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+                  // unsigned long long int filter_subscript2 = ((m+1) * mask_yx_depth)
+                  //   + (off_y * mask_x_depth)
+                  //   + (off_x << in_l_shift)
+                  //   + d;
+                  // unsigned long long int filter_subscript3 = ((m+2) * mask_yx_depth)
+                  //   + (off_y * mask_x_depth)
+                  //   + (off_x << in_l_shift)
+                  //   + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                  __m256 s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim]);
+                  __m256 s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift)]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]); 
+                  __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                  __m256 w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s2, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s3, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w3, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w3, temp8);
+                  temp9 = _mm256_fmadd_ps(s3, w3, temp9);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 8 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 8 + (2 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript]); 
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s2, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s3, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w3, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w3, temp8);
+                  temp9 = _mm256_fmadd_ps(s3, w3, temp9);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 16 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 16 + (2 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript]); 
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s2, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s3, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w3, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w3, temp8);
+                  temp9 = _mm256_fmadd_ps(s3, w3, temp9);
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 24 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 24 + (2 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript]); 
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s, w2, temp4);
+                  temp5 = _mm256_fmadd_ps(s2, w2, temp5);
+                  temp6 = _mm256_fmadd_ps(s3, w2, temp6);
+                  temp7 = _mm256_fmadd_ps(s, w3, temp7);
+                  temp8 = _mm256_fmadd_ps(s2, w3, temp8);
+                  temp9 = _mm256_fmadd_ps(s3, w3, temp9);
+                }
+              }
+            }
+
+
+            const unsigned long long int out_subscript = b_out +
+              y_out +
+              (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + Output_depth_dim;
+            const unsigned long long int out_subscript3 = out_subscript + (2 << out_l_shift);
+            const unsigned long long int out_subscript4 = out_subscript + 1;
+            const unsigned long long int out_subscript5 = out_subscript + 1 + Output_depth_dim;
+            const unsigned long long int out_subscript6 = out_subscript + 1 + (2 << out_l_shift);
+            const unsigned long long int out_subscript7 = out_subscript + 2;
+            const unsigned long long int out_subscript8 = out_subscript + 2 + Output_depth_dim;
+            const unsigned long long int out_subscript9 = out_subscript + 2 + (2 << out_l_shift);
+
+            // unsigned long long int out_subscript2 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+1) << out_l_shift)
+            //   + m;
+            // unsigned long long int out_subscript3 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+2) << out_l_shift)
+            //   + m;
+            // unsigned long long int out_subscript4 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   (x << out_l_shift)
+            //   + (m+1);
+            // unsigned long long int out_subscript5 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+1) << out_l_shift)
+            //   + (m+1);
+            // unsigned long long int out_subscript6 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+2) << out_l_shift)
+            //   + (m+1);
+            // unsigned long long int out_subscript7 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   (x << out_l_shift)
+            //   + (m+2);
+            // unsigned long long int out_subscript8 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+1) << out_l_shift)
+            //   + (m+2);
+            // unsigned long long int out_subscript9 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+2) << out_l_shift)
+            //   + (m+2);
+
+
+            __m128 sseLo = _mm256_castps256_ps128(temp);
+						__m128 sseHi = _mm256_extractf128_ps(temp, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						__m128 sseShuf = _mm_movehdup_ps(sseLo);
+						__m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						float sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp2);
+						 sseHi = _mm256_extractf128_ps(temp2, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript2] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp3);
+						 sseHi = _mm256_extractf128_ps(temp3, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript3] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp4);
+						 sseHi = _mm256_extractf128_ps(temp4, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias2;
+						out_to_compare_with_FP[out_subscript4] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp5);
+						 sseHi = _mm256_extractf128_ps(temp5, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias2;
+						out_to_compare_with_FP[out_subscript5] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp6);
+						 sseHi = _mm256_extractf128_ps(temp6, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias2;
+						out_to_compare_with_FP[out_subscript6] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp7);
+						 sseHi = _mm256_extractf128_ps(temp7, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias3;
+						out_to_compare_with_FP[out_subscript7] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp8);
+						 sseHi = _mm256_extractf128_ps(temp8, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias3;
+						out_to_compare_with_FP[out_subscript8] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp9);
+						 sseHi = _mm256_extractf128_ps(temp9, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias3;
+						out_to_compare_with_FP[out_subscript9] = RELU(sum);
+          }
+          // overflow/ fallback x loop
+          for (; x < Output_X_dim; x++) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+
+                  unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+                  // unsigned long long int filter_subscript2 = ((m+1) * mask_yx_depth)
+                  //   + (off_y * mask_x_depth)
+                  //   + (off_x << in_l_shift)
+                  //   + d;
+                  // unsigned long long int filter_subscript3 = ((m+2) * mask_yx_depth)
+                  //   + (off_y * mask_x_depth)
+                  //   + (off_x << in_l_shift)
+                  //   + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+                  __m256 w2 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth]);
+                  __m256 w3 = _mm256_load_ps(&filter_FP[filter_subscript + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w3, temp3);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + 8 + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + 8 + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w3, temp3);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + 16 + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + 16 + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w3, temp3);
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+                   w2 = _mm256_load_ps(&filter_FP[filter_subscript + 24 + mask_yx_depth]);
+                   w3 = _mm256_load_ps(&filter_FP[filter_subscript + 24 + mask_yx_depth + mask_yx_depth]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s, w2, temp2);
+                  temp3 = _mm256_fmadd_ps(s, w3, temp3);
+                }
+              }
+            }
+            unsigned long long int out_subscript = b_out +
+              y_out +
+              (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + 1;
+            const unsigned long long int out_subscript3 = out_subscript + 2;
+            // unsigned long long int out_subscript2 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   (x << out_l_shift)
+            //   + (m+1);
+            // unsigned long long int out_subscript3 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   (x << out_l_shift)
+            //   + (m+2);
+
+
+
+            __m128 sseLo = _mm256_castps256_ps128(temp);
+						__m128 sseHi = _mm256_extractf128_ps(temp, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						__m128 sseShuf = _mm_movehdup_ps(sseLo);
+						__m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						float sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp2);
+						 sseHi = _mm256_extractf128_ps(temp2, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias2;
+						out_to_compare_with_FP[out_subscript2] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp3);
+						 sseHi = _mm256_extractf128_ps(temp3, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias3;
+						out_to_compare_with_FP[out_subscript3] = RELU(sum);
+          }
+        }
+        for (; m < Output_depth_dim; m++) {
+          const unsigned long long int m_mask = m * mask_yx_depth;
+
+          const float bias = bias_array_FP[m];
+
+          for (x = 0; x < x_bound2; x+=4) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+
+            __m256 temp = _mm256_setzero_ps();
+            __m256 temp2 = _mm256_setzero_ps();
+            __m256 temp3 = _mm256_setzero_ps();
+            __m256 temp4 = _mm256_setzero_ps();
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+                  // unsigned long long int in_subscript2 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+1) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+                  // unsigned long long int in_subscript3 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+2) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+                  // unsigned long long int in_subscript4 = b * (in_yx_depth)
+                  //   + ((y * Stride_Y_dim + off_y) * in_x_depth)
+                  //   + (((x+3) * Stride_X_dim + off_x) << in_l_shift)
+                  //   + d;
+
+                  unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+                  __m256 s2 = _mm256_load_ps(&in_FP[in_subscript + Input_depth_dim]);
+                  __m256 s3 = _mm256_load_ps(&in_FP[in_subscript + (2 << in_l_shift)]);
+                  __m256 s4 = _mm256_load_ps(&in_FP[in_subscript + (3 << in_l_shift)]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 8 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 8 + (2 << in_l_shift)]);
+                   s4 = _mm256_load_ps(&in_FP[in_subscript + 8 + (3 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 168]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 16 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 16 + (2 << in_l_shift)]);
+                   s4 = _mm256_load_ps(&in_FP[in_subscript + 16 + (3 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+                   s2 = _mm256_load_ps(&in_FP[in_subscript + 24 + Input_depth_dim]);
+                   s3 = _mm256_load_ps(&in_FP[in_subscript + 24 + (2 << in_l_shift)]);
+                   s4 = _mm256_load_ps(&in_FP[in_subscript + 24 + (3 << in_l_shift)]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+                  temp2 = _mm256_fmadd_ps(s2, w, temp2);
+                  temp3 = _mm256_fmadd_ps(s3, w, temp3);
+                  temp4 = _mm256_fmadd_ps(s4, w, temp4);
+
+                }
+              }
+            }
+
+            const unsigned long long int out_subscript = b_out +
+              y_out +
+              (x << out_l_shift)
+              + m;
+            const unsigned long long int out_subscript2 = out_subscript + Output_depth_dim;
+            const unsigned long long int out_subscript3 = out_subscript + (2 << out_l_shift);
+            const unsigned long long int out_subscript4 = out_subscript + (3 << out_l_shift);
+            // unsigned long long int out_subscript2 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+1) << out_l_shift)
+            //   + m;
+            // unsigned long long int out_subscript3 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+2) << out_l_shift)
+            //   + m;
+            // unsigned long long int out_subscript4 = b * (out_yx_depth) +
+            //   y * (out_x_depth) +
+            //   ((x+3) << out_l_shift)
+            //   + m;
+
+
+
+            __m128 sseLo = _mm256_castps256_ps128(temp);
+						__m128 sseHi = _mm256_extractf128_ps(temp, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						__m128 sseShuf = _mm_movehdup_ps(sseLo);
+						__m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						float sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp2);
+						 sseHi = _mm256_extractf128_ps(temp2, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript2] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp3);
+						 sseHi = _mm256_extractf128_ps(temp3, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript3] = RELU(sum);
+
+
+             sseLo = _mm256_castps256_ps128(temp4);
+						 sseHi = _mm256_extractf128_ps(temp4, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						 sseShuf = _mm_movehdup_ps(sseLo);
+						 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						 sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript4] = RELU(sum);
+          }
+          for (; x < Output_X_dim; x++) {	//Output Width
+            const unsigned long long int x_stride = x * Stride_X_dim;
+            __m256 temp = _mm256_setzero_ps();
+
+            for (unsigned int off_y = 0; off_y < Mask_Y_dim; off_y++) {
+              const unsigned long long int off_y_stride = (y_stride + off_y) * in_x_depth;
+              const unsigned long long int off_y_mask = off_y * mask_x_depth;
+
+              for (unsigned int off_x = 0; off_x < Mask_X_dim; off_x++) {
+                const unsigned long long int off_x_stride = (x_stride + off_x) << in_l_shift;
+                const unsigned long long int off_x_depth = off_x << in_l_shift;
+
+                for (unsigned int d = 0; d < Input_depth_dim; d+=32) {
+
+                  unsigned long long int in_subscript = b_in
+                    + off_y_stride
+                    + off_x_stride
+                    + d;
+
+                  unsigned long long int filter_subscript = m_mask
+                    + off_y_mask
+                    + off_x_depth
+                    + d;
+
+                  __m256 s = _mm256_load_ps(&in_FP[in_subscript]);
+
+                  __m256 w = _mm256_load_ps(&filter_FP[filter_subscript]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+
+                  // d+8 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 8]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 8]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+
+                  // d+16 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 16]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 16]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+
+
+                  // d+24 ------------------------------------------------------------
+                  // |
+                  // |
+                  // v
+
+                  // in_subscript += 8;
+
+                  // filter_subscript += 8;
+
+                   s = _mm256_load_ps(&in_FP[in_subscript + 24]);
+
+                   w = _mm256_load_ps(&filter_FP[filter_subscript + 24]);
+
+                  temp = _mm256_fmadd_ps(s, w, temp);
+
+                }
+              }
+            }
+            unsigned long long int out_subscript = b_out +
+              y_out +
+              (x << out_l_shift)
+              + m;
+
+
+            __m128 sseLo = _mm256_castps256_ps128(temp);
+						__m128 sseHi = _mm256_extractf128_ps(temp, 1);
+						sseLo = _mm_add_ps(sseLo, sseHi);
+
+						__m128 sseShuf = _mm_movehdup_ps(sseLo);
+						__m128 sseSum = _mm_add_ps(sseLo, sseShuf);
+						sseShuf = _mm_movehl_ps(sseShuf, sseSum);
+						sseSum = _mm_add_ss(sseSum, sseShuf);
+						float sum = _mm_cvtss_f32(sseSum);
+						sum += bias;
+						out_to_compare_with_FP[out_subscript] = RELU(sum);
+
+          }
+        }
+      }
+    }
+  }
+  #undef left_shift
+  #undef RELU
+  printf("\n from optv14 x3 m3 - cleaned code %f %f ", out_to_compare_with_FP[0], out_to_compare_with_FP[1]);
+  return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
