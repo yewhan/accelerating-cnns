@@ -5,7 +5,7 @@ The code is split up into both a CPU-enabled Convolution-ReLU layer, and a GPU-e
 
 ## CPU
 The CPU portion of the code was designed for a Ryzen 5 3600 CPU.
-Multiple versions of the code was developed, each utilising a slightly different set of/ order of optimisations applied.
+Multiple versions of the code were developed, each utilising a slightly different set of/ order of optimisations applied.
 
 ## GPU
 The GPU portion of the code was designed for a GTX 1080 Ti.
