@@ -14,24 +14,24 @@ The GPU portion of the code was designed for a GTX 1080 Ti.
 ### CPU
 The CPU-enabled code leverages the following optimisations:
 
-Vectorisation via SIMD,
-Parallelisation via OpenMP,
-Quantisation,
-Loop Unrolling,
-Strength Reduction,
-Moving Code Outside of Loops,
-Common Subscript Elimination,
-Loop Interchange,
-Replacing Function Calls with Inlined Functions,
-Constant Declaration,
-Declaring Variables Inside of the Loop Body,
-Loop Tiling.
+- Vectorisation via SIMD,
+- Parallelisation via OpenMP,
+- Quantisation,
+- Loop Unrolling,
+- Strength Reduction,
+- Moving Code Outside of Loops,
+- Common Subscript Elimination,
+- Loop Interchange,
+- Replacing Function Calls with Inlined Functions,
+- Constant Declaration,
+- Declaring Variables Inside of the Loop Body,
+- Loop Tiling.
 
 ### GPU
 The GPU-enabled code leverages the following optimisations:
 
-Asynchronous Memory Transfers,
-Parallelisation via SIMT
+- Asynchronous Memory Transfers,
+- Parallelisation via SIMT
 
 ## Running the Code
 ### CPU
